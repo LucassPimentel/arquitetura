@@ -1,0 +1,237 @@
+﻿@page "/"
+@page "/channels"
+@rendermode InteractiveServer
+@using Notification.Blazor.Models
+@using Notification.Blazor.Services
+@using Notification.Domain.Ports.In
+@inject ChannelService ChannelService
+@inject ISendNotificationUseCase SendNotificationUseCase
+@inject INotificationFactory NotificationFactory;
+
+<PageTitle>Canais de Notificação</PageTitle>
+
+<div class="container mt-5">
+    <h1 class="mb-4">Canais de Notificação</h1>
+
+    <div class="row">
+        <!-- Coluna de seleção de canais -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Selecione um Canal</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @if (channels != null && channels.Any())
+                        {
+                            @foreach (var channel in channels)
+                            {
+                                <button class="list-group-item list-group-item-action @(selectedChannel?.Name == channel.Name ? "active" : "") @(!channel.IsAvailable ? "disabled" : "")"
+                                        @onclick="() => SelectChannel(channel)"
+                                        disabled="@(!channel.IsAvailable)">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span class="badge @(channel.IsAvailable ? "bg-info" : "bg-danger")">@channel.Name</span>
+                                        @if (!channel.IsAvailable)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-2">Indisponível</span>
+                                        }
+                                    </div>
+                                </button>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna de detalhes e formulário -->
+        <div class="col-md-8">
+            @if (selectedChannel != null)
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Canal Selecionado: @selectedChannel.Name</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Adaptador Utilizado:</h6>
+                                <p class="fw-bold">@selectedChannel.Adapter</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Caso de Uso:</h6>
+                                <p class="fw-bold">@selectedChannel.UseCase</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-muted">Status:</h6>
+                                <p>
+                                    @if (selectedChannel.IsAvailable)
+                                    {
+                                        <span class="badge bg-success">✓ Disponível</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">✗ Indisponível</span>
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (selectedChannel.IsAvailable)
+                {
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Enviar Mensagem via @selectedChannel.Name</h5>
+                        </div>
+                        <div class="card-body">
+                            <form>
+                                <div class="mb-3">
+                                    <label for="recipient" class="form-label">Destinatário:</label>
+                                    <input type="text" class="form-control" id="recipient"
+                                                       @bind="messageForm.Recipient"
+                                                      placeholder="@(currentSpec?.RecipientPlaceholder ?? "Insira o destinatário")">
+                                           </div>
+
+                                           @if (currentSpec?.RequiresSubject == true)
+                                           {
+                                               <div class="mb-3">
+                                                   <label for="subject" class="form-label">Assunto:</label>
+                                                   <input type="text" class="form-control" id="subject"
+                                                          @bind="messageForm.Subject"
+                                                          placeholder="Digite o assunto">
+                                               </div>
+                                           }
+
+                                <div class="mb-3">
+                                    <label for="message" class="form-label">Mensagem:</label>
+                                    <textarea class="form-control" id="message" rows="5"
+                                              @bind="messageForm.Message"
+                                              placeholder="Digite sua mensagem"></textarea>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-success btn-lg" @onclick="SendMessage" disabled="@isLoading">
+                                        @if (isLoading)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            <span>Enviando...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="me-2">📤</span>
+                                            <span>Enviar via @selectedChannel.Name</span>
+                                        }
+                                    </button>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(message))
+                                {
+                                    <div class="alert @(messageIsSuccess ? "alert-success" : "alert-danger") mt-3" role="alert">
+                                        @message
+                                    </div>
+                                }
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Canal Indisponível:</strong> O adaptador @selectedChannel.Adapter não está disponível para uso.
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="alert alert-warning" role="alert">
+                    <strong>Nenhum canal selecionado.</strong> Selecione um canal na esquerda para enviar uma mensagem.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ChannelModel> channels = new();
+    private ChannelModel? selectedChannel;
+    private ChannelSpecification? currentSpec;
+    private string message = string.Empty;
+    private bool messageIsSuccess = false;
+    private bool isLoading = false;
+    private MessageFormModel messageForm = new();
+
+    protected override void OnInitialized()
+    {
+        channels = ChannelService.GetChannels();
+
+        if (channels.Any())
+        {
+            SelectChannel(channels.First());
+        }
+    }
+
+    private void SelectChannel(ChannelModel channel)
+    {
+        selectedChannel = channel;
+        currentSpec = NotificationFactory.GetSpecification(channel.Name);
+        message = string.Empty;
+        messageIsSuccess = false;
+        messageForm = new();
+    }
+
+    private async Task SendMessage()
+    {
+        if (selectedChannel == null || !selectedChannel.IsAvailable)
+        {
+            message = "❌ Erro: Canal não disponível.";
+            messageIsSuccess = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(messageForm.Recipient))
+        {
+            message = "❌ Erro: O destinatário é obrigatório.";
+            messageIsSuccess = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(messageForm.Message))
+        {
+            message = "❌ Erro: A mensagem não pode estar vazia.";
+            messageIsSuccess = false;
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var request = new CreateNotificationRequest(
+                selectedChannel.Name,
+                messageForm.Recipient,
+                messageForm.Subject,
+                messageForm.Message
+            );
+
+            var notification = NotificationFactory.CreateNotification(request);
+            await SendNotificationUseCase.Execute(notification);
+
+            message = $"✅ Mensagem enviada com sucesso via {selectedChannel.Name}!";
+            messageIsSuccess = true;
+            messageForm = new();
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Erro ao enviar: {ex.Message}";
+            messageIsSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

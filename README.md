@@ -1,0 +1,407 @@
+# ?? Sistema de Notificações Multi-Canal — Arquitetura Hexagonal (Ports & Adapters)
+
+> Projeto de estudo e demonstração prática da **Arquitetura Hexagonal** (também conhecida como **Ports & Adapters**) aplicada a um sistema de envio de notificações por múltiplos canais (**Email**, **SMS** e **WhatsApp**), construído com **.NET 8** e **Blazor Server**.
+
+---
+
+## ?? Índice
+
+- [Sobre o Projeto](#-sobre-o-projeto)
+- [O que é Arquitetura Hexagonal?](#-o-que-é-arquitetura-hexagonal)
+- [Visão Geral da Arquitetura](#-visão-geral-da-arquitetura)
+- [Estrutura da Solução](#-estrutura-da-solução)
+- [As Portas e os Adaptadores](#-as-portas-e-os-adaptadores)
+- [Fluxo de uma Notificação](#-fluxo-de-uma-notificação)
+- [Padrões de Projeto Utilizados](#-padrões-de-projeto-utilizados)
+- [Quando Usar Arquitetura Hexagonal](#-quando-usar-arquitetura-hexagonal)
+- [Quando NÃO Usar (Trade-offs)](#-quando-não-usar-trade-offs)
+- [Vantagens e Desvantagens](#-vantagens-e-desvantagens)
+- [Como Executar](#-como-executar)
+- [Observações de Validação e Evolução](#-observações-de-validação-e-evolução)
+- [Conclusão](#-conclusão)
+
+---
+
+## ?? Sobre o Projeto
+
+Esta aplicação permite enviar notificações através de diferentes canais de comunicação. O usuário seleciona um canal na interface (Blazor), digita o destinatário, assunto e mensagem, e o sistema roteia a notificação para o **adaptador** correto.
+
+O objetivo principal **não é o produto em si**, mas demonstrar como a **Arquitetura Hexagonal** isola as regras de negócio das tecnologias externas (UI, provedores de email, APIs de mensageria), tornando o núcleo da aplicação **testável, independente e fácil de evoluir**.
+
+> ?? **Nota:** Atualmente os gateways de envio (Email, SMS e WhatsApp) estão **simulados** (apenas registram logs), o que é perfeito para demonstrar a arquitetura sem depender de credenciais ou serviços externos. Trocar uma simulação por uma implementação real exige alterar **apenas o adaptador**, sem tocar no núcleo — e é exatamente esse o ponto da Arquitetura Hexagonal.
+
+---
+
+## ?? O que é Arquitetura Hexagonal?
+
+A **Arquitetura Hexagonal** foi proposta por **Alistair Cockburn** em 2005. A ideia central é simples e poderosa:
+
+> *"Permita que uma aplicação seja igualmente conduzida por usuários, programas, testes automatizados ou scripts, e que seja desenvolvida e testada isoladamente de seus dispositivos e bancos de dados em tempo de execução."*
+
+Em vez de pensar em camadas horizontais empilhadas (UI ? Negócio ? Banco), pensamos em um **núcleo central** (o hexágono) cercado por **portas** e **adaptadores**:
+
+- **Núcleo (Domínio + Aplicação):** contém as regras de negócio. **Não conhece** tecnologia externa.
+- **Portas (Ports):** são **interfaces** que definem *como* o mundo externo conversa com o núcleo (e vice-versa).
+- **Adaptadores (Adapters):** são **implementações concretas** das portas, que conectam o núcleo a tecnologias reais (Blazor, SMTP, APIs REST, etc.).
+
+A regra de ouro é a **Regra de Dependência**: **as dependências sempre apontam para dentro**, em direção ao núcleo. O domínio nunca depende da infraestrutura — é a infraestrutura que depende das abstrações do domínio (Inversão de Dependência - o "D" do SOLID).
+
+### Portas de Entrada vs Portas de Saída
+
+| Tipo | Também chamada de | Direção | Exemplo neste projeto |
+|------|-------------------|---------|------------------------|
+| **Porta de Entrada** (Driving/Primary) | Lado que **conduz** a aplicação | Mundo externo ? Núcleo | `ISendNotificationUseCase` |
+| **Porta de Saída** (Driven/Secondary) | Lado que **é conduzido** pela aplicação | Núcleo ? Mundo externo | `INotificationGateway` |
+
+---
+
+## ??? Visão Geral da Arquitetura
+
+```mermaid
+flowchart LR
+	subgraph Driving["?? Adaptadores de Entrada (Driving)"]
+		UI["Blazor UI<br/>Channels.razor"]
+		Factory["NotificationFactory"]
+	end
+
+	subgraph Core["? NÚCLEO (Hexágono)"]
+		direction TB
+		InPort(["?? Porta IN<br/>ISendNotificationUseCase"])
+		UseCase["SendNotificationUseCase<br/>(Application)"]
+		Domain["Entidades de Domínio<br/>Email / SMS / WhatsApp<br/>(Domain)"]
+		OutPort(["?? Porta OUT<br/>INotificationGateway"])
+
+		InPort --> UseCase
+		UseCase --> Domain
+		UseCase --> OutPort
+	end
+
+	subgraph Driven["?? Adaptadores de Saída (Driven)"]
+		Email["EmailGateway"]
+		SMS["SmsGateway"]
+		WhatsApp["WhatsAppGateway"]
+	end
+
+	UI --> InPort
+	UI --> Factory
+	Factory --> Domain
+	OutPort --> Email
+	OutPort --> SMS
+	OutPort --> WhatsApp
+```
+
+### Direção das Dependências entre Projetos
+
+```mermaid
+flowchart TD
+	Blazor["Hexagonal<br/>(Blazor / Composition Root)"]
+	App["Notification.Application<br/>(Casos de Uso)"]
+	Infra["Notification.Infrastructure<br/>(Gateways)"]
+	Domain["Notification.Domain<br/>(Núcleo / Portas)"]
+
+	Blazor --> App
+	Blazor --> Infra
+	Blazor --> Domain
+	App --> Domain
+	Infra --> Domain
+
+	style Domain fill:#2d6a4f,color:#fff
+	style App fill:#1d3557,color:#fff
+	style Infra fill:#1d3557,color:#fff
+	style Blazor fill:#457b9d,color:#fff
+```
+
+> ? **Observe:** `Notification.Domain` **não referencia nenhum outro projeto**. Ele é o centro do hexágono. Todas as setas apontam para ele — essa é a materialização da *Regra de Dependência*.
+
+---
+
+## ?? Estrutura da Solução
+
+```
+Arquiteturas/
+?
+??? Notification.Domain/            ? NÚCLEO — não depende de ninguém
+?   ??? Abstract/
+?   ?   ??? Notification.cs          ? Classe base abstrata (Template Method)
+?   ??? Entities/
+?   ?   ??? EmailNotification.cs     ? Regras e validações de Email
+?   ?   ??? SmsNotification.cs       ? Regras e validações de SMS
+?   ?   ??? WhatsAppNotification.cs  ? Regras e validações de WhatsApp
+?   ??? Ports/
+?       ??? In/
+?       ?   ??? ISendNotificationUseCase.cs   ?? Porta de ENTRADA
+?       ??? Out/
+?           ??? INotificationGateway.cs       ?? Porta de SAÍDA
+?
+??? Notification.Application/        ?? CASOS DE USO — depende só do Domain
+?   ??? DTOs/
+?   ?   ??? CreateNotificationRequest.cs
+?   ??? Factories/
+?   ?   ??? INotificationFactory.cs
+?   ??? UseCases/
+?       ??? SendNotificationUseCase.cs        ? Implementa a porta de entrada
+?
+??? Notification.Infrastructure/    ?? ADAPTADORES DE SAÍDA — depende só do Domain
+?   ??? Gateways/
+?   ?   ??? EmailGateway.cs          ? Implementa INotificationGateway
+?   ?   ??? SmsGateway.cs            ? Implementa INotificationGateway
+?   ?   ??? WhatsAppGateway.cs       ? Implementa INotificationGateway
+?   ??? DependecyInjection/
+?       ??? ServiceCollectionExtensions.cs
+?
+??? Hexagonal/ (Notification.Blazor) ??? ADAPTADOR DE ENTRADA + COMPOSITION ROOT
+	??? Components/Pages/
+	?   ??? Channels.razor           ? Interface do usuário
+	??? Factories/
+	?   ??? NotificationFactory.cs   ? Implementa INotificationFactory
+	??? Services/
+	?   ??? ChannelService.cs        ? Descobre canais dinamicamente
+	??? Models/
+	?   ??? ChannelModel.cs
+	?   ??? MessageFormModel.cs
+	??? Program.cs                   ? Composition Root (liga tudo via DI)
+```
+
+---
+
+## ?? As Portas e os Adaptadores
+
+### Porta de Entrada — `ISendNotificationUseCase`
+
+Define **o que** a aplicação sabe fazer, sem revelar **como**. É o contrato que o mundo externo (a UI) usa para conduzir o núcleo.
+
+```csharp
+namespace Notification.Domain.Ports.In
+{
+	public interface ISendNotificationUseCase
+	{
+		Task Execute(Abstract.Notification notification);
+	}
+}
+```
+
+### Porta de Saída — `INotificationGateway`
+
+Define **o que** o núcleo precisa do mundo externo (enviar a mensagem), sem saber **qual** tecnologia será usada.
+
+```csharp
+namespace Notification.Domain.Ports.Out
+{
+	public interface INotificationGateway
+	{
+		string Channel { get; }
+		Task SendAsync(Abstract.Notification notification);
+	}
+}
+```
+
+### O Caso de Uso (Núcleo da Aplicação)
+
+O `SendNotificationUseCase` recebe **todos** os gateways disponíveis via injeção de dependência e seleciona o correto pelo nome do canal. Ele depende apenas da **abstração** (`INotificationGateway`), nunca de uma implementação concreta:
+
+```csharp
+public class SendNotificationUseCase : ISendNotificationUseCase
+{
+	private readonly IEnumerable<INotificationGateway> _gateway;
+
+	public SendNotificationUseCase(IEnumerable<INotificationGateway> gateway)
+		=> _gateway = gateway;
+
+	public async Task Execute(Notification notification)
+	{
+		var gateway = _gateway.FirstOrDefault(g => g.Channel == notification.Channel);
+		if (gateway != null)
+			await gateway.SendAsync(notification);
+	}
+}
+```
+
+### Os Adaptadores de Saída
+
+Cada gateway é um adaptador que implementa a porta `INotificationGateway`. Para adicionar um **novo canal** (ex.: Telegram, Push), basta **criar um novo adaptador** — o núcleo permanece intocado:
+
+```csharp
+public class EmailGateway : INotificationGateway
+{
+	public string Channel => "Email";
+	// ...
+	public async Task SendAsync(Notification notification)
+	{
+		// Adaptação para a tecnologia concreta (SMTP, API, etc.)
+	}
+}
+```
+
+---
+
+## ?? Fluxo de uma Notificação
+
+```mermaid
+sequenceDiagram
+	participant U as ?? Usuário
+	participant UI as Channels.razor<br/>(Adaptador IN)
+	participant F as NotificationFactory
+	participant UC as SendNotificationUseCase<br/>(Porta IN)
+	participant E as Entidade de Domínio
+	participant G as INotificationGateway<br/>(Porta OUT)
+	participant A as Gateway Concreto<br/>(Adaptador OUT)
+
+	U->>UI: Preenche formulário e clica "Enviar"
+	UI->>F: CreateNotification(request)
+	F->>E: new EmailNotification(...)
+	F-->>UI: Notification
+	UI->>UC: Execute(notification)
+	UC->>G: Seleciona gateway por Channel
+	UC->>A: SendAsync(notification)
+	A->>E: Validate() + OnBeforeSend()
+	A->>A: Envia (SMTP / API / simulação)
+	A->>E: MarkAsSent()
+	A-->>UC: ?
+	UC-->>UI: ?
+	UI-->>U: "Mensagem enviada com sucesso!"
+```
+
+**Passo a passo:**
+
+1. O usuário interage com o **adaptador de entrada** (`Channels.razor`).
+2. A `NotificationFactory` cria a **entidade de domínio** correta a partir do DTO (`CreateNotificationRequest`).
+3. A UI invoca a **porta de entrada** (`ISendNotificationUseCase`).
+4. O caso de uso seleciona o **adaptador de saída** adequado via **porta de saída** (`INotificationGateway`).
+5. O gateway executa as **regras de domínio** (`Validate`, `OnBeforeSend`) e realiza o envio.
+6. A entidade atualiza seu próprio estado (`MarkAsSent` / `MarkAsFailed`).
+
+---
+
+## ?? Padrões de Projeto Utilizados
+
+| Padrão | Onde | Para quê |
+|--------|------|----------|
+| **Ports & Adapters** | Toda a solução | Isolar o núcleo das tecnologias externas |
+| **Template Method** | `Notification` (abstract) | Definir o esqueleto do ciclo de vida (`Validate`, `OnBeforeSend`, `OnAfterSend`) e deixar as subclasses especializarem |
+| **Factory** | `INotificationFactory` / `NotificationFactory` | Criar a entidade correta a partir do nome do canal |
+| **Strategy** (implícito) | `INotificationGateway` + seleção por `Channel` | Trocar o algoritmo de envio em tempo de execução |
+| **Dependency Injection** | `Program.cs` + `ServiceCollectionExtensions` | Inversão de controle e composição (Composition Root) |
+
+### Destaque: a classe base `Notification` (Template Method)
+
+```csharp
+public abstract class Notification
+{
+	public NotificationStatus Status { get; set; } = NotificationStatus.Pending;
+
+	public void MarkAsSent()  { Status = NotificationStatus.Sent;   SentAt = DateTime.UtcNow; OnAfterSend(); }
+	public void MarkAsFailed(string error) { Status = NotificationStatus.Failed; ErrorMessage = error; }
+
+	public abstract void Validate();              // cada canal valida do seu jeito
+	public abstract string GetNotificationType();
+	public virtual void OnBeforeSend() { }        // hook opcional
+	public virtual void OnAfterSend()  { }        // hook opcional
+}
+```
+
+Cada canal tem regras próprias — por exemplo, o SMS limita a mensagem a **160 caracteres** e calcula o número de partes; o WhatsApp valida o formato **E.164** do telefone; o Email valida o formato do endereço. **Tudo isso vive no domínio**, não na infraestrutura.
+
+---
+
+## ? Quando Usar Arquitetura Hexagonal
+
+A Arquitetura Hexagonal brilha nos seguintes cenários:
+
+- ?? **Domínio rico e regras de negócio complexas** — quando a lógica de negócio é o ativo mais valioso e precisa ser protegida de detalhes técnicos.
+- ?? **Múltiplas integrações externas** — quando a aplicação conversa com vários sistemas (bancos de dados, filas, APIs, provedores de email/SMS), como neste projeto com seus 3 canais.
+- ?? **Tecnologias que podem mudar** — quando você pode trocar de banco, de provedor de mensageria ou até de framework de UI sem reescrever as regras de negócio.
+- ?? **Alta exigência de testabilidade** — o núcleo pode ser testado com *mocks* das portas, sem subir banco, rede ou UI.
+- ?? **Times médios/grandes e projetos de longa vida** — onde a clareza de fronteiras e a manutenibilidade pagam o custo inicial de estrutura.
+- ?? **Evolução por extensão** — adicionar um novo canal (Telegram, Push, Slack) = adicionar um novo adaptador, sem risco de quebrar o que já existe (princípio Aberto/Fechado).
+
+---
+
+## ?? Quando NÃO Usar (Trade-offs)
+
+Nem todo projeto justifica essa arquitetura. Evite ou pondere quando:
+
+- ?? **CRUDs simples e aplicações pequenas** — se a app é basicamente "salvar e ler do banco" sem regras relevantes, a estrutura adiciona **cerimônia sem retorno**.
+- ?? **Provas de conceito / MVPs descartáveis** — a velocidade inicial importa mais que a manutenibilidade de longo prazo.
+- ?? **Equipes pequenas ou pouco familiarizadas** — a curva de aprendizado (portas, adaptadores, inversão de dependência) pode reduzir a produtividade no começo.
+- ?? **Excesso de indireção** — cada porta é uma interface a mais; em domínios triviais isso vira *boilerplate* e dificulta a leitura.
+- ?? **Mapeamentos repetitivos** — DTOs ? entidades ? modelos de UI podem gerar código de tradução que parece "burocrático" em apps simples.
+
+> ?? **Regra prática:** o custo da Arquitetura Hexagonal é **estrutura e indireção**; o benefício é **isolamento e manutenibilidade**. Use quando o benefício superar o custo — ou seja, quando o domínio for valioso e a vida do projeto for longa.
+
+---
+
+## ?? Vantagens e Desvantagens
+
+| ? Vantagens | ? Desvantagens |
+|-------------|----------------|
+| Núcleo independente de frameworks e tecnologias | Mais arquivos, interfaces e indireção |
+| Altamente testável (mocks nas portas) | Curva de aprendizado inicial |
+| Troca de tecnologia sem tocar nas regras de negócio | *Over-engineering* em projetos simples |
+| Fronteiras claras entre responsabilidades | Mais código *boilerplate* (mapeamentos/DTOs) |
+| Facilita evolução (novos canais = novos adaptadores) | Pode parecer "burocrático" para times pequenos |
+| Favorece os princípios SOLID, em especial o DIP | Exige disciplina para manter a Regra de Dependência |
+
+---
+
+## ?? Como Executar
+
+**Pré-requisitos:** [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+
+```powershell
+# Restaurar dependências
+dotnet restore
+
+# Compilar a solução
+dotnet build
+
+# Executar a aplicação Blazor
+dotnet run --project Hexagonal
+```
+
+Acesse a aplicação no navegador (por padrão `https://localhost:xxxx`), selecione um canal, preencha o formulário e envie. Como os gateways estão **simulados**, o resultado do envio aparece nos **logs** da aplicação (console).
+
+---
+
+## ?? Observações de Validação e Evolução
+
+Durante a validação do projeto, identifiquei alguns pontos que **não impedem o funcionamento**, mas que valem como reflexão arquitetural (e ótimos temas de discussão para o post ??):
+
+1. **Namespace da Factory vs. localização física**
+   O arquivo `Notification.Application/Factories/INotificationFactory.cs` declara o namespace `Notification.Domain.Interfaces.Factories`, mas está fisicamente no projeto **Application**. Conceitualmente, uma factory que cria entidades de domínio se aproxima de uma **porta** — então faria sentido movê-la para `Notification.Domain/Ports/` (ou alinhar o namespace ao projeto que a contém).
+
+2. **Implementação da Factory na camada de apresentação**
+   `NotificationFactory` (a implementação) vive no projeto **Blazor**. Funciona, mas concentrar a criação de entidades na **Application** deixaria a camada de UI mais "fina" e focada em apresentação.
+
+3. **Erro de digitação em pasta**
+   A pasta `DependecyInjection` deveria ser `DependencyInjection`. É cosmético, mas afeta a profissionalização do repositório público.
+
+4. **Gateways simulados**
+   Email, SMS e WhatsApp atualmente **simulam** o envio (logs). Para produção, basta implementar o envio real **dentro de cada adaptador** — sem qualquer mudança no núcleo. Isso é, na prática, a maior prova de valor da arquitetura.
+
+5. **Validação opcional na borda**
+   As validações de domínio (`Validate()`) são robustas. Uma evolução natural seria também validar o DTO de entrada na camada de aplicação, retornando erros amigáveis antes de instanciar a entidade.
+
+> Esses itens são **oportunidades de melhoria**, não defeitos — e demonstram que a estrutura hexagonal facilita identificar exatamente *onde* cada ajuste deve ocorrer.
+
+---
+
+## ?? Conclusão
+
+Este projeto mostra, na prática, como a **Arquitetura Hexagonal** mantém o **domínio no centro** e empurra as tecnologias para as bordas. O resultado é um sistema onde:
+
+- As **regras de negócio** (validações de cada canal) vivem isoladas e protegidas.
+- **Adicionar um canal** novo significa **adicionar um adaptador**, não modificar o núcleo.
+- **Trocar a tecnologia** de envio não afeta a lógica da aplicação.
+- O código é **testável**, **legível** e **preparado para evoluir**.
+
+A Arquitetura Hexagonal não é uma bala de prata: ela troca **simplicidade inicial** por **manutenibilidade de longo prazo**. Sabendo *quando* aplicá-la, ela se torna uma ferramenta poderosa para construir software que dura.
+
+---
+
+<div align="center">
+
+**Construído com .NET 8 + Blazor Server** • Demonstração de Arquitetura Hexagonal (Ports & Adapters)
+
+? Se este projeto te ajudou a entender Arquitetura Hexagonal, deixe uma estrela!
+
+</div>
