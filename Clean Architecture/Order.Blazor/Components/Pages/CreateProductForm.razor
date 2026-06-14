@@ -1,0 +1,182 @@
+@using Order.Application.DTOs.Product
+@using Order.Application.Interfaces
+
+@inject IProductService ProductService
+@inject ILogger<CreateProductForm> Logger
+
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">
+            <i class="bi @(IsEditing ? "bi-pencil-square" : "bi-plus-circle") me-2"></i>
+            @(IsEditing ? "Editar Produto" : "Novo Produto")
+        </h5>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@formModel" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="productName" class="form-label fw-semibold">Nome *</label>
+                    <InputText id="productName" class="form-control" @bind-Value="formModel.Name"
+                               placeholder="Nome do produto" />
+                    <ValidationMessage For="@(() => formModel.Name)" />
+                </div>
+
+                <div class="col-md-4">
+                    <label for="productPrice" class="form-label fw-semibold">Preço *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <InputNumber id="productPrice" class="form-control" @bind-Value="formModel.Price" />
+                    </div>
+                    <ValidationMessage For="@(() => formModel.Price)" />
+                </div>
+
+                @if (IsEditing)
+                {
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="form-check form-switch">
+                            <InputCheckbox id="productActive" class="form-check-input" @bind-Value="activeValue" />
+                            <label class="form-check-label" for="productActive">Ativo</label>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-success" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Salvando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-lg me-2"></i>
+                        <span>@(IsEditing ? "Atualizar" : "Cadastrar")</span>
+                    }
+                </button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Limpar
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>@errorMessage
+                </div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnProductSaved { get; set; }
+
+    [Parameter]
+    public UpdateProductDto? ProductToEdit { get; set; }
+
+    private ProductFormModel formModel = new();
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+
+    private bool activeValue
+    {
+        get => formModel.Active;
+        set => formModel.Active = value;
+    }
+
+    private bool IsEditing => ProductToEdit is not null;
+
+    protected override void OnParametersSet()
+    {
+        if (ProductToEdit is not null)
+        {
+            formModel = new ProductFormModel
+            {
+                Name = ProductToEdit.Name,
+                Price = ProductToEdit.Price,
+                Active = ProductToEdit.Active
+            };
+        }
+        else
+        {
+            formModel = new ProductFormModel();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (IsEditing)
+            {
+                var updateDto = new UpdateProductDto
+                {
+                    Id = ProductToEdit!.Id,
+                    Name = formModel.Name,
+                    Price = formModel.Price,
+                    Active = formModel.Active
+                };
+
+                var result = await ProductService.UpdateAsync(updateDto);
+                if (!result.IsSuccess)
+                {
+                    errorMessage = result.Error?.Message ?? "Erro ao atualizar produto.";
+                    return;
+                }
+            }
+            else
+            {
+                var createDto = new CreateProductDto
+                {
+                    Name = formModel.Name,
+                    Price = formModel.Price
+                };
+
+                var result = await ProductService.CreateAsync(createDto);
+                if (!result.IsSuccess)
+                {
+                    errorMessage = result.Error?.Message ?? "Erro ao cadastrar produto.";
+                    return;
+                }
+            }
+
+            await OnProductSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar produto");
+            errorMessage = "Ocorreu um erro inesperado. Tente novamente.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        formModel = IsEditing
+            ? new ProductFormModel { Name = ProductToEdit!.Name, Price = ProductToEdit.Price, Active = ProductToEdit.Active }
+            : new ProductFormModel();
+        errorMessage = string.Empty;
+    }
+
+    private class ProductFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "O nome é obrigatório.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100, ErrorMessage = "O nome pode ter no máximo 100 caracteres.")]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(0.01, (double)decimal.MaxValue, ErrorMessage = "O preço deve ser maior que zero.")]
+        public decimal Price { get; set; }
+
+        public bool Active { get; set; } = true;
+    }
+}

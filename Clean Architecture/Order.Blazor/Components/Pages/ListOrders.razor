@@ -1,0 +1,511 @@
+@using Order.Application.DTOs.Order
+@using Order.Application.DTOs.Product
+@using Order.Application.Interfaces
+@using Order.Domain.Enums
+
+@inject IOrderService OrderService
+@inject IProductService ProductService
+@inject ILogger<ListOrders> Logger
+
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Lista de Pedidos</h5>
+        <button class="btn btn-sm btn-outline-light" @onclick="HandleRefresh">
+            <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
+        </button>
+    </div>
+    <div class="card-body p-0">
+        @if (Orders == null || !Orders.Any())
+        {
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                <span>Nenhum pedido encontrado.</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Total</th>
+                            <th>Desconto</th>
+                            <th>Final</th>
+                            <th>Status</th>
+                            <th>Criado em</th>
+                            <th class="text-center">Itens</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in Orders)
+                        {
+                            <tr>
+                                <td><code class="text-muted" title="@order.Id">@order.Id.ToString()[..8]…</code></td>
+                                <td>@order.ClientId</td>
+                                <td>R$ @order.TotalPrice.ToString("F2")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(order.CouponCode))
+                                    {
+                                        <span class="text-danger">
+                                            <i class="bi bi-tag-fill me-1"></i>-R$ @order.DiscountAmount.ToString("F2")
+                                        </span>
+                                        <br />
+                                        <small class="text-muted">@order.CouponCode</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td><strong>R$ @order.FinalPrice.ToString("F2")</strong></td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(order.Status)">
+                                        @GetStatusText(order.Status)
+                                    </span>
+                                </td>
+                                <td class="text-nowrap">@order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @onclick="() => ToggleDetails(order.Id)"
+                                            title="Ver itens">
+                                        <i class="bi bi-eye me-1"></i>@order.Items.Count
+                                    </button>
+                                </td>
+                                <td class="text-center">
+                                    @if (order.Status == Status.Open)
+                                    {
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <button class="btn btn-sm btn-outline-warning"
+                                                    title="Atualizar itens"
+                                                    @onclick="() => ToggleUpdate(order)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info"
+                                                    title="Aplicar cupom"
+                                                    @onclick="() => ToggleCoupon(order.Id)">
+                                                <i class="bi bi-tag"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success"
+                                                    title="Fechar pedido"
+                                                    @onclick="() => RequestAction(order.Id, ActionType.Close)">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    title="Cancelar pedido"
+                                                    @onclick="() => RequestAction(order.Id, ActionType.Cancel)">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+
+                            @* Aplicar cupom *@
+                            @if (applyCouponOrderId == order.Id)
+                            {
+                                <tr class="table-info bg-opacity-25">
+                                    <td colspan="9">
+                                        <div class="d-flex align-items-center gap-3 px-3 py-2">
+                                            <i class="bi bi-tag-fill text-info fs-5"></i>
+                                            <span class="fw-semibold">Aplicar cupom:</span>
+                                            <input type="text" class="form-control form-control-sm text-uppercase"
+                                                   style="max-width: 200px;"
+                                                   @bind="couponCodeInput"
+                                                   placeholder="Código do cupom" />
+                                            <button class="btn btn-sm btn-info text-white" disabled="@isProcessing"
+                                                    @onclick="() => HandleApplyCoupon(order.Id)">
+                                                @if (isProcessing) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                Aplicar
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearActions">Cancelar</button>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(couponErrorMessage))
+                                        {
+                                            <div class="alert alert-danger mt-2 mx-3 py-2 mb-0">@couponErrorMessage</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+
+                            @* Detalhes dos itens *@
+                            @if (expandedOrderId == order.Id)
+                            {
+                                <tr class="table-light">
+                                    <td colspan="9" class="py-2 px-4">
+                                        <strong class="small text-muted">Itens do pedido:</strong>
+                                        <ul class="list-unstyled mt-1 mb-0 ps-2">
+                                            @foreach (var item in order.Items)
+                                            {
+                                                <li class="small py-1 border-bottom">
+                                                    <i class="bi bi-box me-1 text-primary"></i>
+                                                    <strong>@item.ProductName</strong>
+                                                    <span class="text-muted ms-2">
+                                                        Qtd: @item.Quantity |
+                                                        Preço: R$ @item.Price.ToString("F2") |
+                                                        Subtotal: <strong>R$ @item.SubTotal.ToString("F2")</strong>
+                                                    </span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </td>
+                                </tr>
+                            }
+
+                            @* Confirmação de fechar *@
+                            @if (pendingActionOrderId == order.Id && pendingAction == ActionType.Close)
+                            {
+                                <tr class="table-warning">
+                                    <td colspan="9">
+                                        <div class="d-flex align-items-center gap-3 px-3 py-2">
+                                            <i class="bi bi-question-circle-fill text-warning fs-5"></i>
+                                            <span>Confirmar o <strong>fechamento</strong> deste pedido?</span>
+                                            <button class="btn btn-sm btn-success" disabled="@isProcessing" @onclick="ConfirmAction">
+                                                @if (isProcessing) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                Confirmar
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearActions">Cancelar</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+
+                            @* Confirmação de cancelar *@
+                            @if (pendingActionOrderId == order.Id && pendingAction == ActionType.Cancel)
+                            {
+                                <tr class="table-danger bg-opacity-25">
+                                    <td colspan="9">
+                                        <div class="d-flex align-items-center gap-3 px-3 py-2">
+                                            <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+                                            <span>Tem certeza? O <strong>cancelamento</strong> não pode ser desfeito.</span>
+                                            <button class="btn btn-sm btn-danger" disabled="@isProcessing" @onclick="ConfirmAction">
+                                                @if (isProcessing) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                Cancelar Pedido
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearActions">Voltar</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+
+                            @* Formulário inline de atualização *@
+                            @if (activeUpdateOrderId == order.Id)
+                            {
+                                <tr class="table-light">
+                                    <td colspan="9">
+                                        <div class="p-3">
+                                            <h6 class="mb-3">
+                                                <i class="bi bi-pencil-square me-2 text-warning"></i>Gerenciar itens do pedido
+                                            </h6>
+
+                                            @* Itens existentes com opção de remover *@
+                                            @if (order.Items.Any())
+                                            {
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted fw-semibold">Itens atuais</label>
+                                                    @foreach (var item in order.Items)
+                                                    {
+                                                        <div class="d-flex align-items-center gap-2 mb-2 p-2 border rounded bg-white">
+                                                            <i class="bi bi-box text-primary"></i>
+                                                            <span class="flex-grow-1">
+                                                                <strong>@item.ProductName</strong>
+                                                                <span class="text-muted ms-2">Qtd: @item.Quantity | R$ @item.SubTotal.ToString("F2")</span>
+                                                            </span>
+                                                            <button class="btn btn-sm btn-outline-danger"
+                                                                    disabled="@isProcessing"
+                                                                    @onclick="() => HandleRemoveItem(order.Id, item.Id)"
+                                                                    title="Remover item">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+
+                                            @* Adicionar novo item *@
+                                            @if (products.Any())
+                                            {
+                                                <div class="border rounded p-3 bg-light">
+                                                    <label class="form-label small text-muted fw-semibold">Adicionar novo item</label>
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-md-6">
+                                                            <select class="form-select form-select-sm" @bind="newItemProductId">
+                                                                <option value="@Guid.Empty">— Selecione um produto —</option>
+                                                                @foreach (var product in products)
+                                                                {
+                                                                    <option value="@product.Id">
+                                                                        @product.Name — R$ @product.Price.ToString("F2")
+                                                                    </option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <input type="number" class="form-control form-control-sm"
+                                                                   @bind="newItemQuantity" min="1" placeholder="Quantidade" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <button class="btn btn-sm btn-success w-100"
+                                                                    disabled="@isProcessing"
+                                                                    @onclick="() => HandleAddItem(order.Id)">
+                                                                <i class="bi bi-plus-circle me-1"></i>Adicionar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="alert alert-warning py-2 mb-0">Nenhum produto cadastrado.</div>
+                                            }
+
+                                            <div class="mt-3">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearActions">
+                                                    <i class="bi bi-x-lg me-1"></i>Fechar
+                                                </button>
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(updateErrorMessage))
+                                            {
+                                                <div class="alert alert-danger mt-2 py-2 mb-0">@updateErrorMessage</div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(actionErrorMessage))
+        {
+            <div class="alert alert-danger m-3 mb-0">@actionErrorMessage</div>
+        }
+    </div>
+</div>
+
+@code {
+    private enum ActionType { None, Close, Cancel }
+
+    [Parameter] public List<OrderDto> Orders { get; set; } = new();
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private List<ProductDto> products = new();
+    private Guid? expandedOrderId;
+    private Guid? pendingActionOrderId;
+    private ActionType pendingAction = ActionType.None;
+    private Guid? activeUpdateOrderId;
+    private Guid newItemProductId = Guid.Empty;
+    private int newItemQuantity = 1;
+    private Guid? applyCouponOrderId;
+    private string couponCodeInput = string.Empty;
+    private string couponErrorMessage = string.Empty;
+    private string actionErrorMessage = string.Empty;
+    private string updateErrorMessage = string.Empty;
+    private bool isProcessing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = (await ProductService.GetAllAsync()).ToList();
+    }
+
+    private async Task HandleRefresh()
+    {
+        products = (await ProductService.GetAllAsync()).ToList();
+        await OnRefresh.InvokeAsync();
+    }
+
+    private void ToggleDetails(Guid orderId)
+    {
+        expandedOrderId = expandedOrderId == orderId ? null : orderId;
+    }
+
+    private void RequestAction(Guid orderId, ActionType action)
+    {
+        ClearActions();
+        pendingActionOrderId = orderId;
+        pendingAction = action;
+    }
+
+    private void ToggleUpdate(OrderDto order)
+    {
+        if (activeUpdateOrderId == order.Id) { ClearActions(); return; }
+
+        ClearActions();
+        activeUpdateOrderId = order.Id;
+        newItemProductId = Guid.Empty;
+        newItemQuantity = 1;
+    }
+
+    private void ToggleCoupon(Guid orderId)
+    {
+        if (applyCouponOrderId == orderId) { ClearActions(); return; }
+
+        ClearActions();
+        applyCouponOrderId = orderId;
+        couponCodeInput = string.Empty;
+    }
+
+    private async Task HandleApplyCoupon(Guid orderId)
+    {
+        couponErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(couponCodeInput))
+        {
+            couponErrorMessage = "Informe o código do cupom.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            var result = await OrderService.ApplyCouponAsync(orderId, couponCodeInput.Trim());
+
+            if (!result.IsSuccess)
+            {
+                couponErrorMessage = result.Error?.Message ?? "Erro ao aplicar cupom.";
+            }
+            else
+            {
+                ClearActions();
+                await OnRefresh.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao aplicar cupom ao pedido");
+            couponErrorMessage = "Erro inesperado ao aplicar cupom.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (pendingActionOrderId == null) return;
+        try
+        {
+            isProcessing = true;
+            actionErrorMessage = string.Empty;
+
+            var result = pendingAction == ActionType.Close
+                ? await OrderService.CloseOrderAsync(pendingActionOrderId.Value)
+                : await OrderService.CancelOrderAsync(pendingActionOrderId.Value);
+
+            if (!result.IsSuccess)
+                actionErrorMessage = result.Error?.Message ?? "Erro ao processar ação.";
+            else
+            {
+                ClearActions();
+                await OnRefresh.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao processar ação no pedido");
+            actionErrorMessage = "Erro inesperado.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task HandleAddItem(Guid orderId)
+    {
+        updateErrorMessage = string.Empty;
+
+        if (newItemProductId == Guid.Empty)
+        {
+            updateErrorMessage = "Selecione um produto.";
+            return;
+        }
+        if (newItemQuantity <= 0)
+        {
+            updateErrorMessage = "A quantidade deve ser maior que zero.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            var result = await OrderService.AddItemAsync(orderId, newItemProductId, newItemQuantity);
+
+            if (!result.IsSuccess)
+            {
+                updateErrorMessage = result.Error?.Message ?? "Erro ao adicionar item.";
+            }
+            else
+            {
+                newItemProductId = Guid.Empty;
+                newItemQuantity = 1;
+                await OnRefresh.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao adicionar item ao pedido");
+            updateErrorMessage = "Erro inesperado ao adicionar item.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task HandleRemoveItem(Guid orderId, Guid itemId)
+    {
+        updateErrorMessage = string.Empty;
+
+        try
+        {
+            isProcessing = true;
+            var result = await OrderService.RemoveItemAsync(orderId, itemId);
+
+            if (!result.IsSuccess)
+            {
+                updateErrorMessage = result.Error?.Message ?? "Erro ao remover item.";
+            }
+            else
+            {
+                await OnRefresh.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao remover item do pedido");
+            updateErrorMessage = "Erro inesperado ao remover item.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private void ClearActions()
+    {
+        pendingActionOrderId = null;
+        pendingAction = ActionType.None;
+        activeUpdateOrderId = null;
+        newItemProductId = Guid.Empty;
+        newItemQuantity = 1;
+        applyCouponOrderId = null;
+        couponCodeInput = string.Empty;
+        couponErrorMessage = string.Empty;
+        actionErrorMessage = string.Empty;
+        updateErrorMessage = string.Empty;
+    }
+
+    private string GetStatusBadgeClass(Status status) => status switch
+    {
+        Status.Open => "bg-primary",
+        Status.Finished => "bg-success",
+        Status.Canceled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusText(Status status) => status switch
+    {
+        Status.Open => "Aberto",
+        Status.Finished => "Finalizado",
+        Status.Canceled => "Cancelado",
+        _ => "Desconhecido"
+    };
+}

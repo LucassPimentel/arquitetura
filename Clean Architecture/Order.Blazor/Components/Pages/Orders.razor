@@ -1,0 +1,82 @@
+﻿@page "/orders"
+@rendermode InteractiveServer
+
+@using Order.Application.DTOs.Order
+@using Order.Application.Interfaces
+
+@inject IOrderService OrderService
+@inject ILogger<Orders> Logger
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Gerenciamento de Pedidos</h1>
+        <button class="btn @(showCreateForm ? "btn-outline-secondary" : "btn-primary")"
+                @onclick="ToggleCreateForm">
+            <i class="bi @(showCreateForm ? "bi-x-lg" : "bi-plus-circle") me-2"></i>
+            @(showCreateForm ? "Fechar" : "Novo Pedido")
+        </button>
+    </div>
+
+    @if (showCreateForm)
+    {
+        <div class="mb-4">
+            <CreateOrderForm OnOrderCreated="HandleOrderCreated" />
+        </div>
+    }
+
+    <ListOrders Orders="orders" OnRefresh="LoadOrders" />
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showCreateForm = false;
+    private List<OrderDto> orders = new();
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            var result = await OrderService.GetAllAsync();
+            orders = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar pedidos");
+            errorMessage = "Erro ao carregar pedidos.";
+        }
+    }
+
+    private void ToggleCreateForm()
+    {
+        showCreateForm = !showCreateForm;
+    }
+
+    private async Task HandleOrderCreated()
+    {
+        successMessage = "Pedido criado com sucesso!";
+        showCreateForm = false;
+        await LoadOrders();
+    }
+}

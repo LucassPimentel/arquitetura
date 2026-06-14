@@ -1,0 +1,163 @@
+@page "/products"
+@rendermode InteractiveServer
+
+@using Order.Application.DTOs.Product
+@using Order.Application.Interfaces
+
+@inject IProductService ProductService
+@inject ILogger<Products> Logger
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Gerenciamento de Produtos</h1>
+        <button class="btn @(showCreateForm ? "btn-outline-secondary" : "btn-primary")"
+                @onclick="ToggleCreateForm">
+            <i class="bi @(showCreateForm ? "bi-x-lg" : "bi-plus-circle") me-2"></i>
+            @(showCreateForm ? "Fechar" : "Novo Produto")
+        </button>
+    </div>
+
+    @if (showCreateForm)
+    {
+        <div class="mb-4">
+            <CreateProductForm OnProductSaved="HandleProductSaved" ProductToEdit="productToEdit" />
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    }
+    else if (!products.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>Nenhum produto cadastrado ainda.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Produtos Cadastrados</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nome</th>
+                                <th>Preço</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var product in products)
+                            {
+                                <tr>
+                                    <td class="align-middle">@product.Name</td>
+                                    <td class="align-middle">R$ @product.Price.ToString("F2")</td>
+                                    <td class="align-middle">
+                                        @if (product.Active)
+                                        {
+                                            <span class="badge bg-success">Ativo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inativo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => EditProduct(product)" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty" aria-label="Fechar"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty" aria-label="Fechar"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showCreateForm = false;
+    private bool isLoading = true;
+    private List<ProductDto> products = new();
+    private UpdateProductDto? productToEdit = null;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await ProductService.GetAllAsync();
+            products = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar produtos");
+            errorMessage = "Erro ao carregar produtos.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleCreateForm()
+    {
+        showCreateForm = !showCreateForm;
+        if (!showCreateForm)
+            productToEdit = null;
+    }
+
+    private void EditProduct(ProductDto product)
+    {
+        productToEdit = new UpdateProductDto
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Price = product.Price,
+            Active = product.Active
+        };
+        showCreateForm = true;
+    }
+
+    private async Task HandleProductSaved()
+    {
+        showCreateForm = false;
+        productToEdit = null;
+        successMessage = "Produto salvo com sucesso!";
+        await LoadProducts();
+    }
+}

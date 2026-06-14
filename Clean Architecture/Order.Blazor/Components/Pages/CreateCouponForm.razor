@@ -1,0 +1,225 @@
+@using Order.Application.DTOs.Coupon
+@using Order.Application.Interfaces
+
+@inject ICouponService CouponService
+@inject ILogger<CreateCouponForm> Logger
+
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">
+            <i class="bi @(IsEditing ? "bi-pencil-square" : "bi-plus-circle") me-2"></i>
+            @(IsEditing ? "Editar Cupom" : "Novo Cupom")
+        </h5>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@formModel" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="couponCode" class="form-label fw-semibold">Código *</label>
+                    <InputText id="couponCode" class="form-control text-uppercase" @bind-Value="formModel.Code"
+                               placeholder="Ex: PROMO2024" />
+                    <ValidationMessage For="@(() => formModel.Code)" />
+                </div>
+
+                <div class="col-md-8">
+                    <label for="couponName" class="form-label fw-semibold">Nome *</label>
+                    <InputText id="couponName" class="form-control" @bind-Value="formModel.Name"
+                               placeholder="Descrição do cupom" />
+                    <ValidationMessage For="@(() => formModel.Name)" />
+                </div>
+
+                <div class="col-md-3">
+                    <label for="couponDiscount" class="form-label fw-semibold">Desconto Fixo (R$)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <InputNumber id="couponDiscount" class="form-control" @bind-Value="formModel.Discount" />
+                    </div>
+                    <ValidationMessage For="@(() => formModel.Discount)" />
+                </div>
+
+                <div class="col-md-3">
+                    <label for="couponPercent" class="form-label fw-semibold">Desconto (%)</label>
+                    <div class="input-group">
+                        <InputNumber id="couponPercent" class="form-control" @bind-Value="formModel.PercentualDiscount" />
+                        <span class="input-group-text">%</span>
+                    </div>
+                    <ValidationMessage For="@(() => formModel.PercentualDiscount)" />
+                </div>
+
+                <div class="col-md-3">
+                    <label for="couponMaxDiscount" class="form-label fw-semibold">Desconto Máximo (R$) *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <InputNumber id="couponMaxDiscount" class="form-control" @bind-Value="formModel.MaxDiscount" />
+                    </div>
+                    <ValidationMessage For="@(() => formModel.MaxDiscount)" />
+                </div>
+
+                <div class="col-md-3">
+                    <label for="couponExpiration" class="form-label fw-semibold">Validade *</label>
+                    <InputDate id="couponExpiration" class="form-control" @bind-Value="formModel.ExpirationDate" />
+                    <ValidationMessage For="@(() => formModel.ExpirationDate)" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-success" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Salvando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-lg me-2"></i>
+                        <span>@(IsEditing ? "Atualizar" : "Cadastrar")</span>
+                    }
+                </button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Limpar
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>@errorMessage
+                </div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnCouponSaved { get; set; }
+
+    [Parameter]
+    public UpdateCouponDto? CouponToEdit { get; set; }
+
+    private CouponFormModel formModel = new();
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+
+    private bool IsEditing => CouponToEdit is not null;
+
+    protected override void OnParametersSet()
+    {
+        if (CouponToEdit is not null)
+        {
+            formModel = new CouponFormModel
+            {
+                Code = CouponToEdit.Code,
+                Name = CouponToEdit.Name,
+                Discount = CouponToEdit.Discount,
+                PercentualDiscount = CouponToEdit.PercentualDiscount,
+                MaxDiscount = CouponToEdit.MaxDiscount,
+                ExpirationDate = CouponToEdit.ExpirationDate
+            };
+        }
+        else
+        {
+            formModel = new CouponFormModel();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            if (IsEditing)
+            {
+                var updateDto = new UpdateCouponDto
+                {
+                    Id = CouponToEdit!.Id,
+                    Code = formModel.Code,
+                    Name = formModel.Name,
+                    Discount = formModel.Discount,
+                    PercentualDiscount = formModel.PercentualDiscount,
+                    MaxDiscount = formModel.MaxDiscount,
+                    ExpirationDate = formModel.ExpirationDate
+                };
+
+                var result = await CouponService.UpdateAsync(updateDto);
+                if (!result.IsSuccess)
+                {
+                    errorMessage = result.Error?.Message ?? "Erro ao atualizar cupom.";
+                    return;
+                }
+            }
+            else
+            {
+                var createDto = new CreateCouponDto
+                {
+                    Code = formModel.Code,
+                    Name = formModel.Name,
+                    Discount = formModel.Discount,
+                    PercentualDiscount = formModel.PercentualDiscount,
+                    MaxDiscount = formModel.MaxDiscount,
+                    ExpirationDate = formModel.ExpirationDate
+                };
+
+                var result = await CouponService.CreateAsync(createDto);
+                if (!result.IsSuccess)
+                {
+                    errorMessage = result.Error?.Message ?? "Erro ao cadastrar cupom.";
+                    return;
+                }
+            }
+
+            await OnCouponSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar cupom");
+            errorMessage = "Ocorreu um erro inesperado. Tente novamente.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        formModel = IsEditing
+            ? new CouponFormModel
+            {
+                Code = CouponToEdit!.Code,
+                Name = CouponToEdit.Name,
+                Discount = CouponToEdit.Discount,
+                PercentualDiscount = CouponToEdit.PercentualDiscount,
+                MaxDiscount = CouponToEdit.MaxDiscount,
+                ExpirationDate = CouponToEdit.ExpirationDate
+            }
+            : new CouponFormModel();
+        errorMessage = string.Empty;
+    }
+
+    private class CouponFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "O código é obrigatório.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(20, ErrorMessage = "O código pode ter no máximo 20 caracteres.")]
+        public string Code { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "O nome é obrigatório.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100, ErrorMessage = "O nome pode ter no máximo 100 caracteres.")]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(0, (double)decimal.MaxValue, ErrorMessage = "O desconto fixo não pode ser negativo.")]
+        public decimal Discount { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0, 100, ErrorMessage = "O desconto percentual deve estar entre 0 e 100.")]
+        public decimal PercentualDiscount { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0.01, (double)decimal.MaxValue, ErrorMessage = "O desconto máximo deve ser maior que zero.")]
+        public decimal MaxDiscount { get; set; }
+
+        public DateTime ExpirationDate { get; set; } = DateTime.UtcNow.AddMonths(1);
+    }
+}

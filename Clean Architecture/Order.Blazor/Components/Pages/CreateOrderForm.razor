@@ -1,0 +1,190 @@
+﻿@using Order.Application.DTOs.Order
+@using Order.Application.DTOs.Product
+@using Order.Application.Interfaces
+
+@inject IOrderService OrderService
+@inject IProductService ProductService
+@inject ILogger<CreateOrderForm> Logger
+
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Novo Pedido</h5>
+    </div>
+    <div class="card-body">
+        @if (productsLoaded && !products.Any())
+        {
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Nenhum produto cadastrado. Cadastre produtos antes de criar um pedido.
+            </div>
+        }
+        else
+        {
+            <EditForm Model="@createOrderDto" OnValidSubmit="@HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label for="clientId" class="form-label fw-semibold">ID do Cliente *</label>
+                    <InputNumber id="clientId" class="form-control" @bind-Value="createOrderDto.ClientId" />
+                    <ValidationMessage For="@(() => createOrderDto.ClientId)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Itens do Pedido *</label>
+                    <div class="border rounded p-3 bg-light">
+                        @for (int i = 0; i < createOrderDto.Items.Count; i++)
+                        {
+                            var index = i;
+                            <div class="card mb-2 border-0 shadow-sm">
+                                <div class="card-body py-2">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-7">
+                                            <label class="form-label small text-muted mb-1">Produto</label>
+                                            <select class="form-select" @bind="createOrderDto.Items[index].ProductId">
+                                                <option value="@Guid.Empty">— Selecione um produto —</option>
+                                                @foreach (var product in products)
+                                                {
+                                                    <option value="@product.Id">@product.Name — R$ @product.Price.ToString("F2")</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small text-muted mb-1">Quantidade</label>
+                                            <InputNumber class="form-control" @bind-Value="createOrderDto.Items[index].Quantity" min="1" />
+                                            <ValidationMessage For="@(() => createOrderDto.Items[index].Quantity)" />
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100"
+                                                    @onclick="() => RemoveItem(index)" title="Remover item">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-1" @onclick="AddItem">
+                            <i class="bi bi-plus-circle me-1"></i>Adicionar Item
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="couponId" class="form-label fw-semibold">
+                        ID do Cupom <span class="text-muted fw-normal">(Opcional)</span>
+                    </label>
+                    <InputText id="couponId" class="form-control" @bind-Value="couponIdInput"
+                               placeholder="Cole o ID do cupom aqui" />
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Criando...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-lg me-2"></i><span>Criar Pedido</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Limpar
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success mt-3">
+                        <i class="bi bi-check-circle me-2"></i>@successMessage
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger mt-3">@errorMessage</div>
+                }
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnOrderCreated { get; set; }
+
+    private CreateOrderDto createOrderDto = new();
+    private List<ProductDto> products = new();
+    private bool productsLoaded = false;
+    private string couponIdInput = string.Empty;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = (await ProductService.GetAllAsync()).ToList();
+        productsLoaded = true;
+        createOrderDto.Items.Add(new CreateOrderItemDto());
+    }
+
+    private void AddItem() => createOrderDto.Items.Add(new CreateOrderItemDto());
+
+    private void RemoveItem(int index)
+    {
+        if (createOrderDto.Items.Count > 1)
+            createOrderDto.Items.RemoveAt(index);
+        else
+            errorMessage = "O pedido deve ter pelo menos um item.";
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        if (createOrderDto.Items.Any(i => i.ProductId == Guid.Empty))
+        {
+            errorMessage = "Selecione um produto para todos os itens.";
+            return;
+        }
+
+        if (Guid.TryParse(couponIdInput, out var couponId) && couponId != Guid.Empty)
+            createOrderDto.CouponId = couponId;
+
+        try
+        {
+            isSubmitting = true;
+            var result = await OrderService.CreateAsync(createOrderDto);
+
+            if (result.IsSuccess)
+            {
+                successMessage = $"Pedido criado com sucesso! ID: {result.Value?.Id}";
+                ResetForm();
+                await OnOrderCreated.InvokeAsync();
+            }
+            else
+            {
+                errorMessage = $"Erro: {result.Error?.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar pedido");
+            errorMessage = "Erro inesperado ao criar pedido.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        createOrderDto = new();
+        createOrderDto.Items.Add(new CreateOrderItemDto());
+        couponIdInput = string.Empty;
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+}

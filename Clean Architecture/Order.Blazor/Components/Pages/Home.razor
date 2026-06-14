@@ -1,0 +1,61 @@
+﻿@page "/"
+
+<PageTitle>Order Management</PageTitle>
+
+<div class="container mt-4">
+    <div class="text-center mb-5">
+        <h1 class="display-5 fw-bold text-dark">
+            <i class="bi bi-box-seam me-2"></i>Order Management
+        </h1>
+        <p class="lead text-muted">Sistema de gerenciamento de pedidos, produtos e cupons</p>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-4">
+            <a href="/products" class="text-decoration-none">
+                <div class="card h-100 shadow-sm border-0 text-center p-4 card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-box-seam display-3 text-primary mb-3"></i>
+                        <h5 class="card-title text-dark">Produtos</h5>
+                        <p class="card-text text-muted">Cadastre e gerencie os produtos disponíveis para venda.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4">
+            <a href="/coupons" class="text-decoration-none">
+                <div class="card h-100 shadow-sm border-0 text-center p-4 card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-tag display-3 text-success mb-3"></i>
+                        <h5 class="card-title text-dark">Cupons</h5>
+                        <p class="card-text text-muted">Crie cupons de desconto para aplicar nos pedidos.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4">
+            <a href="/orders" class="text-decoration-none">
+                <div class="card h-100 shadow-sm border-0 text-center p-4 card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-receipt display-3 text-warning mb-3"></i>
+                        <h5 class="card-title text-dark">Pedidos</h5>
+                        <p class="card-text text-muted">Crie pedidos, adicione itens e aplique cupons de desconto.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15) !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .card-hover {
+        transition: all 0.2s ease-in-out;
+    }
+</style>

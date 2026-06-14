@@ -1,0 +1,38 @@
+﻿@inherits LayoutComponentBase
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-box-seam me-2"></i>Order Management
+        </a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/products">
+                        <i class="bi bi-box-seam me-1"></i>Produtos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/coupons">
+                        <i class="bi bi-tag me-1"></i>Cupons
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/orders">
+                        <i class="bi bi-receipt me-1"></i>Pedidos
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="page-body py-4">
+    @Body
+</main>
+
+<div id="blazor-error-ui" class="alert alert-danger m-3" style="display:none">
+    Ocorreu um erro inesperado.
+    <a href="" class="alert-link">Recarregar</a>
+    <a class="dismiss float-end" style="cursor:pointer">&#10006;</a>
+</div>

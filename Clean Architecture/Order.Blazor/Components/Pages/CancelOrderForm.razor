@@ -1,0 +1,113 @@
+﻿@using Order.Application.DTOs.Order
+@using Order.Application.Interfaces
+
+@inject IOrderService OrderService
+@inject ILogger<CancelOrderForm> Logger
+
+<div class="card">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">Cancelar Pedido</h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Esta ação irá cancelar o pedido permanentemente. Um pedido cancelado não pode ser reaberto.
+        </div>
+
+        <div class="mb-3">
+            <label for="cancelOrderId" class="form-label">ID do Pedido *</label>
+            <input id="cancelOrderId" type="text" class="form-control" @bind="orderIdInput" placeholder="Cole o ID do pedido" />
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-danger" @onclick="HandleSubmit" disabled="@isSubmitting">
+                @if (isSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>Cancelando...</span>
+                }
+                else
+                {
+                    <span>Cancelar Pedido</span>
+                }
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="ResetForm">Limpar</button>
+        </div>
+
+        @if (canceledOrder != null)
+        {
+            <div class="alert alert-success mt-3">
+                <strong>Pedido cancelado com sucesso!</strong>
+                <ul class="mb-0 mt-1">
+                    <li>ID: <code>@canceledOrder.Id</code></li>
+                    <li>Cliente: @canceledOrder.ClientId</li>
+                    <li>Total: R$ @canceledOrder.TotalPrice.ToString("F2")</li>
+                    <li>Status: Cancelado</li>
+                </ul>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible mt-3">
+                @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnOrderCanceled { get; set; }
+
+    private string orderIdInput = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isSubmitting = false;
+    private OrderDto? canceledOrder;
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = string.Empty;
+        canceledOrder = null;
+
+        if (!Guid.TryParse(orderIdInput, out var orderId) || orderId == Guid.Empty)
+        {
+            errorMessage = "ID do pedido inválido.";
+            return;
+        }
+
+        try
+        {
+            isSubmitting = true;
+            var result = await OrderService.CancelOrderAsync(orderId);
+
+            if (result.IsSuccess)
+            {
+                canceledOrder = result.Value;
+                orderIdInput = string.Empty;
+                await OnOrderCanceled.InvokeAsync();
+            }
+            else
+            {
+                errorMessage = $"Erro ao cancelar pedido: {result.Error?.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao cancelar pedido");
+            errorMessage = "Erro inesperado ao cancelar pedido.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        orderIdInput = string.Empty;
+        errorMessage = string.Empty;
+        canceledOrder = null;
+    }
+}

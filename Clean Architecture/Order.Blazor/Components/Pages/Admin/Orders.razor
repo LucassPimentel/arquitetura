@@ -1,0 +1,151 @@
+﻿@page "/admin/orders"
+@using Order.Application.DTOs.Order
+@using Order.Application.Interfaces
+@inject IOrderService OrderService
+@rendermode InteractiveServer
+
+<PageTitle>Gerenciar Pedidos</PageTitle>
+
+<div class="container mt-5">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1>Gerenciar Pedidos</h1>
+        </div>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    @if (orders == null)
+    {
+        <p><em>Carregando pedidos...</em></p>
+    }
+    else if (!orders.Any())
+    {
+        <p><em>Nenhum pedido encontrado.</em></p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente ID</th>
+                        <th>Total</th>
+                        <th>Final</th>
+                        <th>Status</th>
+                        <th>Items</th>
+                        <th>AÃ§Ãµes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in orders)
+                    {
+                        <tr>
+                            <td>@order.Id.ToString().Substring(0, 8)</td>
+                            <td>@order.ClientId</td>
+                            <td>R$ @order.TotalPrice.ToString("F2")</td>
+                            <td>R$ @order.FinalPrice.ToString("F2")</td>
+                            <td><span class="badge bg-info">@order.Status</span></td>
+                            <td>@order.Items.Count</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" @onclick="() => ViewOrder(order)">
+                                    Detalhes
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Modal de Detalhes -->
+@if (showModal && selectedOrder != null)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalhes do Pedido</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>ID:</strong> @selectedOrder.Id</p>
+                    <p><strong>Cliente:</strong> @selectedOrder.ClientId</p>
+                    <p><strong>Total:</strong> R$ @selectedOrder.TotalPrice.ToString("F2")</p>
+                    <p><strong>Final:</strong> R$ @selectedOrder.FinalPrice.ToString("F2")</p>
+                    <p><strong>Status:</strong> @selectedOrder.Status</p>
+                    <p><strong>Criado em:</strong> @selectedOrder.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
+
+                    <h6>Items do Pedido</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Quantidade</th>
+                                    <th>PreÃ§o</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in selectedOrder.Items)
+                                {
+                                    <tr>
+                                        <td>@item.Quantity</td>
+                                        <td>R$ @item.Price.ToString("F2")</td>
+                                        <td>R$ @item.SubTotal.ToString("F2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IEnumerable<OrderDto>? orders;
+    private OrderDto? selectedOrder;
+    private bool showModal = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            errorMessage = null;
+            orders = await OrderService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao carregar pedidos: {ex.Message}";
+        }
+    }
+
+    private void ViewOrder(OrderDto order)
+    {
+        selectedOrder = order;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedOrder = null;
+    }
+}

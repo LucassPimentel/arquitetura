@@ -1,0 +1,248 @@
+@page "/coupons"
+@rendermode InteractiveServer
+
+@using Order.Application.DTOs.Coupon
+@using Order.Application.Interfaces
+
+@inject ICouponService CouponService
+@inject ILogger<Coupons> Logger
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Gerenciamento de Cupons</h1>
+        <button class="btn @(showCreateForm ? "btn-outline-secondary" : "btn-primary")"
+                @onclick="ToggleCreateForm">
+            <i class="bi @(showCreateForm ? "bi-x-lg" : "bi-plus-circle") me-2"></i>
+            @(showCreateForm ? "Fechar" : "Novo Cupom")
+        </button>
+    </div>
+
+    @if (showCreateForm)
+    {
+        <div class="mb-4">
+            <CreateCouponForm OnCouponSaved="HandleCouponSaved" CouponToEdit="couponToEdit" />
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    }
+    else if (!coupons.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>Nenhum cupom cadastrado ainda.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-tag me-2"></i>Cupons Cadastrados</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Código</th>
+                                <th>Nome</th>
+                                <th>Desconto Fixo</th>
+                                <th>Desconto %</th>
+                                <th>Máximo</th>
+                                <th>Validade</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var coupon in coupons)
+                            {
+                                <tr class="@(coupon.Active ? "" : "table-secondary")">
+                                    <td class="align-middle"><code>@coupon.Code</code></td>
+                                    <td class="align-middle">@coupon.Name</td>
+                                    <td class="align-middle">R$ @coupon.Discount.ToString("F2")</td>
+                                    <td class="align-middle">@coupon.PercentualDiscount.ToString("F1")%</td>
+                                    <td class="align-middle">R$ @coupon.MaxDiscount.ToString("F2")</td>
+                                    <td class="align-middle text-nowrap">@coupon.ExpirationDate.ToString("dd/MM/yyyy")</td>
+                                    <td class="align-middle">
+                                        @if (coupon.Active && coupon.ExpirationDate > DateTime.UtcNow)
+                                        {
+                                            <span class="badge bg-success">Ativo</span>
+                                        }
+                                        else if (!coupon.Active)
+                                        {
+                                            <span class="badge bg-secondary">Inativo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">Expirado</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex justify-content-end gap-1">
+                                            <button class="btn btn-sm btn-outline-primary"
+                                                    @onclick="() => EditCoupon(coupon)" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            @if (coupon.Active)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        disabled="@isProcessing"
+                                                        @onclick="() => HandleDeactivate(coupon.Id)" title="Inativar">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success"
+                                                        disabled="@isProcessing"
+                                                        @onclick="() => HandleActivate(coupon.Id)" title="Ativar">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty" aria-label="Fechar"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty" aria-label="Fechar"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool showCreateForm = false;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private List<CouponDto> coupons = new();
+    private UpdateCouponDto? couponToEdit = null;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoupons();
+    }
+
+    private async Task LoadCoupons()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await CouponService.GetAllAsync();
+            coupons = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar cupons");
+            errorMessage = "Erro ao carregar cupons.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleCreateForm()
+    {
+        showCreateForm = !showCreateForm;
+        if (!showCreateForm)
+            couponToEdit = null;
+    }
+
+    private void EditCoupon(CouponDto coupon)
+    {
+        couponToEdit = new UpdateCouponDto
+        {
+            Id = coupon.Id,
+            Code = coupon.Code,
+            Name = coupon.Name,
+            Discount = coupon.Discount,
+            PercentualDiscount = coupon.PercentualDiscount,
+            MaxDiscount = coupon.MaxDiscount,
+            ExpirationDate = coupon.ExpirationDate
+        };
+        showCreateForm = true;
+    }
+
+    private async Task HandleDeactivate(Guid id)
+    {
+        try
+        {
+            isProcessing = true;
+            errorMessage = string.Empty;
+
+            var result = await CouponService.DeactivateAsync(id);
+            if (!result.IsSuccess)
+            {
+                errorMessage = result.Error?.Message ?? "Erro ao inativar cupom.";
+                return;
+            }
+
+            successMessage = "Cupom inativado com sucesso!";
+            await LoadCoupons();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao inativar cupom");
+            errorMessage = "Erro inesperado ao inativar cupom.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task HandleActivate(Guid id)
+    {
+        try
+        {
+            isProcessing = true;
+            errorMessage = string.Empty;
+
+            var result = await CouponService.ActivateAsync(id);
+            if (!result.IsSuccess)
+            {
+                errorMessage = result.Error?.Message ?? "Erro ao ativar cupom.";
+                return;
+            }
+
+            successMessage = "Cupom ativado com sucesso!";
+            await LoadCoupons();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao ativar cupom");
+            errorMessage = "Erro inesperado ao ativar cupom.";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private async Task HandleCouponSaved()
+    {
+        showCreateForm = false;
+        couponToEdit = null;
+        successMessage = "Cupom salvo com sucesso!";
+        await LoadCoupons();
+    }
+}

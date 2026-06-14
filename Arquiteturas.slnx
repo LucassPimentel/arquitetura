@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/Clean Architecture/">
+    <Project Path="Clean Architecture/Order.Application/Order.Application.csproj" Id="60f2b01e-e402-4114-9d7e-684d7186535a" />
+    <Project Path="Clean Architecture/Order.Blazor/Order.Blazor.csproj" Id="38f497b0-368b-486d-b09f-0403fe31bc5d" />
+    <Project Path="Clean Architecture/Order.CrossCutting/Order.CrossCutting.csproj" Id="ecb40988-47c9-40f9-96f5-447f9d467868" />
+    <Project Path="Clean Architecture/Order.Domain/Order.Domain.csproj" Id="7ce8b85e-56c8-4860-90eb-6f9294682341" />
+    <Project Path="Clean Architecture/Order.Infrastructure/Order.Infrastructure.csproj" Id="8ee61811-a0a3-41df-aad8-6b11d7b4cd4b" />
+  </Folder>
   <Folder Name="/Hexagonal/">
    <File Path="Hexagonal/README.md" />
     <Project Path="Hexagonal/Notification.Api/Notification.Blazor.csproj" />
