@@ -6,6 +6,12 @@
     <Project Path="Clean Architecture/Order.Domain/Order.Domain.csproj" Id="7ce8b85e-56c8-4860-90eb-6f9294682341" />
     <Project Path="Clean Architecture/Order.Infrastructure/Order.Infrastructure.csproj" Id="8ee61811-a0a3-41df-aad8-6b11d7b4cd4b" />
   </Folder>
+  <Folder Name="/CQRS/">
+    <Project Path="CQRS/Social.API/Social.API.csproj" Id="a650269b-30f8-408b-9a00-19371369f1e1" />
+    <Project Path="CQRS/Social.Application/Social.Application.csproj" Id="77e87d1c-3c8c-4c9f-9bdc-7e1c8ed4c8e6" />
+    <Project Path="CQRS/Social.Domain/Social.Domain.csproj" Id="3431b5a1-a6c4-4ac3-8a48-aca55bd6f0b3" />
+    <Project Path="CQRS/Social.Infrastructure/Social.Infrastructure.csproj" Id="03ffe713-78d8-498e-a5d3-d17e7468f933" />
+  </Folder>
   <Folder Name="/Hexagonal/">
    <File Path="Hexagonal/README.md" />
     <Project Path="Hexagonal/Notification.Api/Notification.Blazor.csproj" />
