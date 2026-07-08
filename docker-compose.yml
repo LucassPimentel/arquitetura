@@ -1,20 +1,52 @@
-﻿version: "3.8"
+﻿version: '3.8'
 
 services:
-  db:
+  sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ewallet-sqlserver
+    restart: unless-stopped
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=Your_password123
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "Your_password123"
+      MSSQL_PID: "Express"
     ports:
       - "1433:1433"
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Your_password123 -Q \"SELECT 1\" || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'Your_password123' -Q 'SELECT 1'"]
       interval: 10s
       timeout: 10s
       retries: 10
 
+  mongo:
+    image: mongo:6.0
+    container_name: ewallet-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ewallet-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
 volumes:
   mssql-data:
+  mongo-data:
+  rabbitmq-data:

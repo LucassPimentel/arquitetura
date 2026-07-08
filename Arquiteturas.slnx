@@ -6,6 +6,13 @@
     <Project Path="Clean Architecture/Order.Domain/Order.Domain.csproj" Id="7ce8b85e-56c8-4860-90eb-6f9294682341" />
     <Project Path="Clean Architecture/Order.Infrastructure/Order.Infrastructure.csproj" Id="8ee61811-a0a3-41df-aad8-6b11d7b4cd4b" />
   </Folder>
+  <Folder Name="/CQRS + Event Sourcing/">
+    <Project Path="CQRS + EventSourcing/EWallet.Application/EWallet.Application.csproj" Id="7304744e-f84d-4171-ad97-80bf3d277bf9" />
+    <Project Path="CQRS + EventSourcing/EWallet.Blazor/EWallet.Blazor.csproj" Id="62a10496-c7c3-469a-89ce-b1f6605d5e7b" />
+    <Project Path="CQRS + EventSourcing/EWallet.Domain/EWallet.Domain.csproj" Id="34f1f815-87d6-4ae6-a5ea-dd05bb162f75" />
+    <Project Path="CQRS + EventSourcing/EWallet.Infrastructure/EWallet.Infrastructure.csproj" Id="618406f3-62e1-4740-9461-d1bccef6daaa" />
+    <Project Path="CQRS + EventSourcing/EWallet.Worker/EWallet.Worker.csproj" Id="c3d4e5f6-a7b8-9012-cdef-123456789abc" />
+  </Folder>
   <Folder Name="/CQRS/">
     <Project Path="CQRS/Social.API/Social.API.csproj" Id="a650269b-30f8-408b-9a00-19371369f1e1" />
     <Project Path="CQRS/Social.Application/Social.Application.csproj" Id="77e87d1c-3c8c-4c9f-9bdc-7e1c8ed4c8e6" />
