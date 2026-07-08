@@ -1,0 +1,86 @@
+@page "/events"
+@rendermode InteractiveServer
+@inject EWallet.Infrastructure.Context.EWalletDbContext DbContext
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>EWallet — Event Store</PageTitle>
+
+<h1 class="ew-page-title">Event Store</h1>
+<p class="ew-page-sub">
+    Todos os eventos persistidos no SQL Server — a fonte de verdade do sistema.
+    O Read Model (MongoDB) é projetado a partir destes eventos via RabbitMQ.
+</p>
+
+<div class="ew-action-bar">
+    <button class="ew-btn ew-btn-ghost" @onclick="Recarregar">🔄 Atualizar</button>
+    <span style="color:var(--muted);font-size:13px">@totalEventos evento(s) no store</span>
+</div>
+
+@if (carregando)
+{
+    <div class="ew-loading">⏳ Carregando eventos...</div>
+}
+else if (!eventos.Any())
+{
+    <div class="ew-empty">Nenhum evento no Event Store ainda. Crie uma conta para começar!</div>
+}
+else
+{
+    <div class="ew-card" style="padding:0;overflow:hidden">
+        <table class="ew-table">
+            <thead>
+                <tr>
+                    <th>Versão</th>
+                    <th>Tipo de Evento</th>
+                    <th>Data</th>
+                    <th>Payload</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ev in eventos)
+                {
+                    <tr>
+                        <td style="color:var(--muted);font-size:12px">@ev.Version</td>
+                        <td><span class="event-type">@ExtrairNomeEvento(ev.EventType)</span></td>
+                        <td style="white-space:nowrap;font-size:12px;color:var(--muted)">
+                            @ev.EventDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                        </td>
+                        <td style="max-width:400px">
+                            <details>
+                                <summary style="cursor:pointer;color:var(--primary2);font-size:12px">Ver JSON</summary>
+                                <pre style="margin-top:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all;max-height:140px;overflow:auto">@ev.EventData</pre>
+                            </details>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<EWallet.Domain.Entities.EventRecord> eventos = [];
+    private bool carregando = true;
+    private int totalEventos;
+
+    protected override async Task OnInitializedAsync() => await Recarregar();
+
+    private async Task Recarregar()
+    {
+        carregando = true;
+
+        eventos = await DbContext.Events
+            .AsNoTracking()
+            .OrderByDescending(e => e.EventDate)
+            .ToListAsync();
+
+        totalEventos = eventos.Count;
+        carregando = false;
+    }
+
+    private static string ExtrairNomeEvento(string assemblyQualifiedName)
+    {
+        var fullName = assemblyQualifiedName.Split(',').FirstOrDefault() ?? assemblyQualifiedName;
+        return fullName.Split('.').LastOrDefault() ?? fullName;
+    }
+}

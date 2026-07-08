@@ -1,0 +1,322 @@
+/* ── Reset ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2a2d3e;
+    --primary:  #7c6af7;
+    --primary2: #9d8ff9;
+    --success:  #34d399;
+    --warning:  #fbbf24;
+    --danger:   #f87171;
+    --info:     #60a5fa;
+    --text:     #e2e8f0;
+    --muted:    #6b7280;
+    --radius:   10px;
+    --shadow:   0 4px 24px rgba(0,0,0,.45);
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ── Shell ─────────────────────────────────────── */
+.ew-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ── Sidebar ───────────────────────────────────── */
+.ew-sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+    flex-shrink: 0;
+}
+
+.ew-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.ew-logo-icon { font-size: 24px; }
+.ew-logo-text { font-size: 18px; font-weight: 700; color: var(--primary2); letter-spacing: .5px; }
+
+.ew-nav {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 10px;
+}
+
+.ew-nav a {
+    display: block;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+}
+
+.ew-nav a:hover {
+    background: rgba(124,106,247,.12);
+    color: var(--text);
+}
+
+.ew-nav a.active {
+    background: rgba(124,106,247,.2);
+    color: var(--primary2);
+}
+
+/* ── Main ──────────────────────────────────────── */
+.ew-main { flex: 1; overflow: auto; }
+.ew-content { padding: 32px; max-width: 1200px; }
+
+/* ── Page header ───────────────────────────────── */
+.ew-page-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text);
+}
+.ew-page-sub { color: var(--muted); margin-bottom: 28px; font-size: 13px; }
+
+/* ── Cards ─────────────────────────────────────── */
+.ew-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+}
+
+.ew-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.ew-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* ── Stats grid ────────────────────────────────── */
+.ew-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+/* ── Accounts grid ─────────────────────────────── */
+.ew-accounts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.ew-account-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: border-color .2s, transform .15s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.ew-account-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.ew-account-card .name { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+.ew-account-card .balance { font-size: 22px; font-weight: 700; color: var(--success); margin-bottom: 12px; }
+.ew-account-card .meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+
+/* ── Badge ─────────────────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+}
+.badge-active  { background: rgba(52,211,153,.15); color: var(--success); }
+.badge-blocked { background: rgba(248,113,113,.15); color: var(--danger); }
+.badge-inactive{ background: rgba(107,114,128,.15); color: var(--muted); }
+
+/* ── Buttons ───────────────────────────────────── */
+.ew-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+}
+.ew-btn:disabled { opacity: .45; cursor: not-allowed; }
+.ew-btn:not(:disabled):active { transform: scale(.97); }
+
+.ew-btn-primary  { background: var(--primary);  color: #fff; }
+.ew-btn-primary:not(:disabled):hover  { background: var(--primary2); }
+.ew-btn-success  { background: var(--success);  color: #0f1117; }
+.ew-btn-success:not(:disabled):hover  { opacity: .85; }
+.ew-btn-warning  { background: var(--warning);  color: #0f1117; }
+.ew-btn-warning:not(:disabled):hover  { opacity: .85; }
+.ew-btn-danger   { background: var(--danger);   color: #fff; }
+.ew-btn-danger:not(:disabled):hover   { opacity: .85; }
+.ew-btn-ghost    { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.ew-btn-ghost:not(:disabled):hover    { border-color: var(--primary); color: var(--primary2); }
+
+/* ── Form ──────────────────────────────────────── */
+.ew-form { display: flex; flex-direction: column; gap: 16px; }
+.ew-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.ew-field { display: flex; flex-direction: column; gap: 6px; }
+.ew-field label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+
+.ew-input, .ew-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color .15s;
+    width: 100%;
+}
+.ew-input:focus, .ew-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(124,106,247,.25);
+}
+.ew-input::placeholder { color: var(--muted); }
+
+/* ── Alert ─────────────────────────────────────── */
+.ew-alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ew-alert-success { background: rgba(52,211,153,.12); color: var(--success); border: 1px solid rgba(52,211,153,.3); }
+.ew-alert-error   { background: rgba(248,113,113,.12); color: var(--danger);  border: 1px solid rgba(248,113,113,.3); }
+.ew-alert-info    { background: rgba(96,165,250,.12);  color: var(--info);    border: 1px solid rgba(96,165,250,.3); }
+
+/* ── Table ─────────────────────────────────────── */
+.ew-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ew-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+}
+.ew-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.ew-table tr:last-child td { border-bottom: none; }
+.ew-table tr:hover td { background: rgba(255,255,255,.02); }
+
+.ew-table .event-type {
+    font-family: monospace;
+    font-size: 12px;
+    background: rgba(124,106,247,.12);
+    color: var(--primary2);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* ── Tabs ──────────────────────────────────────── */
+.ew-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+}
+.ew-tab {
+    padding: 10px 18px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s;
+}
+.ew-tab:hover { color: var(--text); }
+.ew-tab.active { color: var(--primary2); border-bottom-color: var(--primary2); }
+
+/* ── Misc ──────────────────────────────────────── */
+.ew-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.ew-back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: none; font-size: 13px; margin-bottom: 20px; }
+.ew-back-link:hover { color: var(--text); }
+.ew-empty { text-align: center; padding: 40px; color: var(--muted); }
+.ew-loading { text-align: center; padding: 40px; color: var(--muted); }
+.ew-action-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; align-items: center; }
+
+/* ── Blazor error ──────────────────────────────── */
+h1:focus { outline: none; }
+.valid.modified:not([type=checkbox]) { outline: 1px solid var(--success); }
+.invalid { outline: 1px solid var(--danger); }
+.validation-message { color: var(--danger); font-size: 12px; }
+
+.blazor-error-boundary {
+    background: var(--danger);
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+    border-radius: var(--radius);
+    margin: 16px;
+}
+.blazor-error-boundary::after { content: "Ocorreu um erro inesperado." }
+
+#blazor-error-ui {
+    background: var(--warning);
+    color: #0f1117;
+    bottom: 0;
+    box-shadow: 0 -1px 0 rgba(0,0,0,.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    font-weight: 600;
+}
+#blazor-error-ui .reload { font-weight: bold; text-decoration: underline; margin-left: 8px; }
+#blazor-error-ui .dismiss { cursor: pointer; float: right; font-weight: bold; }

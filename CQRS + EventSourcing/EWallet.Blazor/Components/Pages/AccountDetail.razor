@@ -1,0 +1,409 @@
+@page "/accounts/{accountId:guid}"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NavigationManager Nav
+
+<PageTitle>EWallet — Conta</PageTitle>
+
+<a href="/" class="ew-back-link">← Voltar ao Dashboard</a>
+
+@if (carregando)
+{
+    <div class="ew-loading">⏳ Carregando...</div>
+}
+else if (conta is null)
+{
+    <div class="ew-alert ew-alert-error">Conta não encontrada no Read Model.</div>
+}
+else
+{
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:4px">
+        <h1 class="ew-page-title" style="margin-bottom:0">👤 @conta.UserName</h1>
+        <StatusBadge Status="@conta.Status" />
+    </div>
+    <p class="ew-page-sub">ID: @conta.Id — Atualizado @conta.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+
+    <div class="ew-stats" style="margin-bottom:24px">
+        <div class="ew-card">
+            <div class="ew-card-title">Saldo</div>
+            <div class="ew-stat-value" style="color:var(--success)">@conta.Balance.ToString("C")</div>
+        </div>
+        <div class="ew-card">
+            <div class="ew-card-title">Status</div>
+            <div class="ew-stat-value" style="font-size:18px"><StatusBadge Status="@conta.Status" /></div>
+        </div>
+        <div class="ew-card">
+            <div class="ew-card-title">Criado em</div>
+            <div class="ew-stat-value" style="font-size:18px">@conta.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+        </div>
+    </div>
+
+    @if (mensagem is not null)
+    {
+        <div class="ew-alert @(sucesso ? "ew-alert-success" : "ew-alert-error")" style="margin-bottom:20px">
+            @mensagem
+        </div>
+    }
+
+    <div class="ew-tabs">
+        <button class="ew-tab @(abaAtiva == "deposit"   ? "active" : "")" @onclick='() => AbrirAba("deposit")'>💰 Depósito</button>
+        <button class="ew-tab @(abaAtiva == "transfer"  ? "active" : "")" @onclick='() => AbrirAba("transfer")'>↔️ Transferência</button>
+        <button class="ew-tab @(abaAtiva == "refund"    ? "active" : "")" @onclick='() => AbrirAba("refund")'>↩️ Reembolso</button>
+        <button class="ew-tab @(abaAtiva == "block"     ? "active" : "")" @onclick='() => AbrirAba("block")'>🔒 Bloquear</button>
+        <button class="ew-tab @(abaAtiva == "events"    ? "active" : "")" @onclick='() => AbrirAba("events")'>📋 Eventos</button>
+    </div>
+
+    <!-- Depósito -->
+    @if (abaAtiva == "deposit")
+    {
+        <div class="ew-card" style="max-width:420px">
+            <div class="ew-card-title" style="margin-bottom:16px">Depositar na conta</div>
+            <div class="ew-form">
+                <div class="ew-field">
+                    <label>Valor (R$)</label>
+                    <input type="number" class="ew-input" @bind="valorDeposito" min="0.01" step="0.01" placeholder="0,00" />
+                </div>
+                <button class="ew-btn ew-btn-success" @onclick="Depositar" disabled="@(enviando || conta.Status != "Active")">
+                    @if (enviando) { <span>⏳...</span> } else { <span>💰 Confirmar Depósito</span> }
+                </button>
+                @if (conta.Status != "Active")
+                {
+                    <div class="ew-alert ew-alert-info">ℹ️ Depósito disponível apenas para contas ativas.</div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Transferência -->
+    @if (abaAtiva == "transfer")
+    {
+        <div class="ew-card" style="max-width:480px">
+            <div class="ew-card-title" style="margin-bottom:16px">Transferir para outra conta</div>
+            <div class="ew-form">
+                <div class="ew-field">
+                    <label>Conta de Destino (ID)</label>
+                    <input type="text" class="ew-input" @bind="idDestino" placeholder="GUID da conta destino" />
+                </div>
+                <div class="ew-field">
+                    <label>Valor (R$)</label>
+                    <input type="number" class="ew-input" @bind="valorTransferencia" min="0.01" step="0.01" placeholder="0,00" />
+                </div>
+                <button class="ew-btn ew-btn-primary" @onclick="Transferir" disabled="@(enviando || conta.Status != "Active")">
+                    @if (enviando) { <span>⏳...</span> } else { <span>↔️ Confirmar Transferência</span> }
+                </button>
+            </div>
+        </div>
+
+        @if (outrasContas.Any())
+        {
+            <div class="ew-card" style="max-width:480px;margin-top:12px">
+                <div class="ew-card-title" style="margin-bottom:12px">Contas disponíveis</div>
+                <table class="ew-table">
+                    <thead><tr><th>Titular</th><th>Saldo</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var c in outrasContas)
+                        {
+                            <tr>
+                                <td>@c.UserName</td>
+                                <td>@c.Balance.ToString("C")</td>
+                                <td><StatusBadge Status="@c.Status" /></td>
+                                <td>
+                                    <button class="ew-btn ew-btn-ghost" style="padding:4px 10px;font-size:11px"
+                                            @onclick="() => idDestino = c.Id.ToString()">
+                                        Selecionar
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+
+    <!-- Reembolso -->
+    @if (abaAtiva == "refund")
+    {
+        <div class="ew-card" style="max-width:480px">
+            <div class="ew-card-title" style="margin-bottom:16px">Reembolsar transferência recebida</div>
+
+            @if (!transferenciasRecebidas.Any())
+            {
+                <div class="ew-empty">Nenhuma transferência recebida disponível para reembolso.</div>
+            }
+            else
+            {
+                <div class="ew-form">
+                    <div class="ew-field">
+                        <label>Selecione a transferência a reembolsar</label>
+                        <select class="ew-input" @onchange="SelecionarTransferencia">
+                            <option value="">-- Selecione --</option>
+                            @foreach (var t in transferenciasRecebidas)
+                            {
+                                <option value="@t.Id">
+                                    @t.Amount.ToString("C") — de @t.SourceAccountId.ToString()[..8]... em @t.EventDate.ToLocalTime().ToString("dd/MM HH:mm")
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (transferenciaReembolsoSelecionada is not null)
+                    {
+                        <div class="ew-alert ew-alert-info" style="margin-bottom:12px">
+                            Valor a ser reembolsado: <strong>@transferenciaReembolsoSelecionada.Amount.ToString("C")</strong>
+                        </div>
+                        <button class="ew-btn ew-btn-warning" @onclick="Reembolsar" disabled="@(enviando || conta.Status != "Active")">
+                            @if (enviando) { <span>⏳...</span> } else { <span>↩️ Confirmar Reembolso</span> }
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Bloquear -->
+    @if (abaAtiva == "block")
+    {
+        <div class="ew-card" style="max-width:420px">
+            <div class="ew-card-title" style="margin-bottom:16px">Bloquear conta</div>
+            @if (conta.Status == "Blocked")
+            {
+                <div class="ew-alert ew-alert-info">ℹ️ Esta conta já está bloqueada.</div>
+            }
+            else
+            {
+                <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+                    Ao bloquear, a conta não poderá receber depósitos, transferências ou reembolsos.
+                    O evento <code style="color:var(--primary2)">AccountBlocked</code> será persistido no Event Store.
+                </p>
+                <button class="ew-btn ew-btn-danger" @onclick="Bloquear" disabled="@enviando">
+                    @if (enviando) { <span>⏳...</span> } else { <span>🔒 Bloquear Conta</span> }
+                </button>
+            }
+        </div>
+    }
+
+    <!-- Eventos -->
+    @if (abaAtiva == "events")
+    {
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:13px;color:var(--muted)">Eventos registrados no Event Store (SQL Server)</span>
+            <button class="ew-btn ew-btn-ghost" @onclick="CarregarEventos">🔄 Atualizar</button>
+        </div>
+
+        @if (carregandoEventos)
+        {
+            <div class="ew-loading">⏳ Carregando eventos...</div>
+        }
+        else if (!eventos.Any())
+        {
+            <div class="ew-empty">Nenhum evento encontrado para esta conta.</div>
+        }
+        else
+        {
+            <div class="ew-card" style="padding:0;overflow:hidden">
+                <table class="ew-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Tipo de Evento</th>
+                            <th>Data</th>
+                            <th>Payload (JSON)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ev in eventos)
+                        {
+                            <tr>
+                                <td style="color:var(--muted)">@ev.Version</td>
+                                <td><span class="event-type">@ev.EventType</span></td>
+                                <td style="white-space:nowrap">@ev.EventDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                                <td style="max-width:340px">
+                                    <details>
+                                        <summary style="cursor:pointer;color:var(--primary2);font-size:12px">Ver JSON</summary>
+                                        <pre style="margin-top:8px;font-size:11px;color:var(--muted);white-space:pre-wrap;word-break:break-all">@ev.EventData</pre>
+                                    </details>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public Guid AccountId { get; set; }
+
+    private AccountReadModel? conta;
+    private IEnumerable<EventRecord> eventos = [];
+    private IEnumerable<AccountReadModel> outrasContas = [];
+    private IEnumerable<MoneyReceived> transferenciasRecebidas = [];
+    private MoneyReceived? transferenciaReembolsoSelecionada;
+    private bool carregando = true;
+    private bool carregandoEventos;
+    private bool enviando;
+    private bool sucesso;
+    private string? mensagem;
+    private string abaAtiva = "deposit";
+
+    private decimal valorDeposito;
+    private decimal valorTransferencia;
+    private decimal valorReembolso;
+    private string idDestino = string.Empty;
+    private string idDestinoReembolso = string.Empty;
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarConta();
+        outrasContas = (await Mediator.Send(new GetAllAccountsQuery()))
+            .Where(c => c.Id != AccountId);
+    }
+
+    private async Task CarregarConta()
+    {
+        carregando = true;
+        conta = await Mediator.Send(new GetAccountByIdQuery { AccountId = AccountId });
+        carregando = false;
+    }
+
+    private async Task AbrirAba(string aba)
+    {
+        abaAtiva = aba;
+        mensagem = null;
+
+        if (aba == "refund")
+            await CarregarTransferenciasRecebidas();
+
+        if (aba == "events")
+            await CarregarEventos();
+    }
+
+    private async Task CarregarTransferenciasRecebidas()
+    {
+        transferenciasRecebidas = await Mediator.Send(new GetReceivedTransfersQuery { AccountId = AccountId });
+        transferenciaReembolsoSelecionada = null;
+        valorReembolso = 0;
+    }
+
+    private void SelecionarTransferencia(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var eventId))
+        {
+            transferenciaReembolsoSelecionada = transferenciasRecebidas.FirstOrDefault(t => t.Id == eventId);
+            valorReembolso = transferenciaReembolsoSelecionada?.Amount ?? 0;
+        }
+        else
+        {
+            transferenciaReembolsoSelecionada = null;
+            valorReembolso = 0;
+        }
+    }
+    private async Task CarregarEventos()
+    {
+        carregandoEventos = true;
+        eventos = await Mediator.Send(new GetEventsByAccountQuery { AccountId = AccountId });
+        carregandoEventos = false;
+    }
+
+    private async Task Depositar()
+    {
+        if (valorDeposito <= 0) { ExibirMensagem("O valor deve ser maior que zero.", false); return; }
+
+        var valor = valorDeposito;
+        await ExecutarOperacao(
+            async () => await Mediator.Send(new DepositCommand { AccountId = AccountId, Amount = valor }),
+            $"Depósito de {valor:C} realizado com sucesso.",
+            () =>
+            {
+                conta!.Balance += valor;
+                valorDeposito = 0;
+            });
+    }
+
+    private async Task Transferir()
+    {
+        if (!Guid.TryParse(idDestino, out var destinoId)) { ExibirMensagem("ID da conta de destino inválido.", false); return; }
+        if (valorTransferencia <= 0) { ExibirMensagem("O valor deve ser maior que zero.", false); return; }
+
+        var valor = valorTransferencia;
+        await ExecutarOperacao(
+            async () => await Mediator.Send(new TransferCommand
+            {
+                SourceAccountId = AccountId,
+                DestinationAccountId = destinoId,
+                Amount = valor
+            }),
+            $"Transferência de {valor:C} realizada com sucesso.",
+            () =>
+            {
+                conta!.Balance -= valor;
+                valorTransferencia = 0;
+                idDestino = string.Empty;
+            });
+    }
+
+    private async Task Reembolsar()
+    {
+        if (transferenciaReembolsoSelecionada is null) { ExibirMensagem("Selecione uma transferência para reembolsar.", false); return; }
+        if (valorReembolso <= 0) { ExibirMensagem("O valor deve ser maior que zero.", false); return; }
+
+        var valor = valorReembolso;
+        var transferencia = transferenciaReembolsoSelecionada;
+        await ExecutarOperacao(
+            async () => await Mediator.Send(new RefundCommand
+            {
+                SourceAccountId = AccountId,
+                DestinationAccountId = transferencia.SourceAccountId,
+                Amount = valor,
+                OriginalTransferEventId = transferencia.Id
+            }),
+            $"Reembolso de {valor:C} realizado com sucesso.",
+            () =>
+            {
+                conta!.Balance -= valor;
+                transferenciaReembolsoSelecionada = null;
+                valorReembolso = 0;
+                transferenciasRecebidas = transferenciasRecebidas
+                    .Where(t => t.Id != transferencia.Id)
+                    .ToList();
+            });
+    }
+
+    private async Task Bloquear()
+    {
+        await ExecutarOperacao(
+            async () => await Mediator.Send(new BlockAccountCommand { AccountId = AccountId }),
+            "Conta bloqueada com sucesso.",
+            () => conta!.Status = "Blocked");
+    }
+
+    private async Task ExecutarOperacao(Func<Task> operacao, string mensagemSucesso, Action aplicarEstadoLocal)
+    {
+        enviando = true;
+        mensagem = null;
+
+        try
+        {
+            await operacao();
+            aplicarEstadoLocal();
+            conta!.UpdatedAt = DateTime.Now;
+            ExibirMensagem(mensagemSucesso, true);
+            outrasContas = (await Mediator.Send(new GetAllAccountsQuery())).Where(c => c.Id != AccountId);
+        }
+        catch (Exception ex)
+        {
+            ExibirMensagem(ex.Message, false);
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    private void ExibirMensagem(string texto, bool ehSucesso)
+    {
+        mensagem = texto;
+        sucesso = ehSucesso;
+    }
+}

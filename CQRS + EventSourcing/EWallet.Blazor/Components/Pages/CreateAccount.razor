@@ -1,0 +1,103 @@
+@page "/accounts/create"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NavigationManager Nav
+
+<PageTitle>EWallet — Nova Conta</PageTitle>
+
+<a href="/" class="ew-back-link">← Voltar ao Dashboard</a>
+
+<h1 class="ew-page-title">Nova Conta</h1>
+<p class="ew-page-sub">
+    O comando <code>CreateAccountCommand</code> é processado pelo MediatR,
+    persistido no Event Store (SQL Server) e publicado no RabbitMQ para hidratar o Read Model.
+</p>
+
+<div class="ew-card" style="max-width:480px">
+    @if (sucesso)
+    {
+        <div class="ew-alert ew-alert-success" style="margin-bottom:20px">
+            ✅ Conta criada com sucesso! ID: <strong>@idCriado</strong>
+        </div>
+    }
+
+    @if (erro is not null)
+    {
+        <div class="ew-alert ew-alert-error" style="margin-bottom:20px">⚠️ @erro</div>
+    }
+
+    <EditForm Model="form" OnValidSubmit="EnviarComando" FormName="CreateAccountForm">
+        <DataAnnotationsValidator />
+        <div class="ew-form">
+            <div class="ew-field">
+                <label>Nome do Titular</label>
+                <InputText class="ew-input" @bind-Value="form.AccountName" placeholder="Ex: João Silva" />
+                <ValidationMessage For="() => form.AccountName" />
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:8px">
+                <button type="submit" class="ew-btn ew-btn-primary" disabled="@enviando">
+                    @if (enviando) { <span>⏳ Enviando...</span> } else { <span>✅ Criar Conta</span> }
+                </button>
+                <button type="button" class="ew-btn ew-btn-ghost" @onclick="Limpar">Limpar</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<div class="ew-card" style="max-width:480px;margin-top:20px">
+    <div class="ew-card-title">Fluxo CQRS + Event Sourcing</div>
+    <ol style="padding-left:18px;color:var(--muted);font-size:13px;line-height:2">
+        <li>Blazor envia <code style="color:var(--primary2)">CreateAccountCommand</code> via MediatR</li>
+        <li><code style="color:var(--primary2)">CreateAccountHandler</code> cria o agregado <code style="color:var(--primary2)">Account</code></li>
+        <li>Evento <code style="color:var(--primary2)">AccountCreated</code> é salvo no Event Store (SQL Server)</li>
+        <li>Evento é publicado no RabbitMQ (exchange fanout)</li>
+        <li><code style="color:var(--primary2)">ReadModelConsumer</code> (Worker) consome e atualiza o MongoDB</li>
+    </ol>
+</div>
+
+@code {
+    private CreateAccountFormModel form = new();
+    private bool enviando;
+    private bool sucesso;
+    private string? erro;
+    private string? idCriado;
+
+    private async Task EnviarComando()
+    {
+        enviando = true;
+        sucesso = false;
+        erro = null;
+
+        try
+        {
+            var command = new CreateAccountCommand { AccountName = form.AccountName };
+            var account = await Mediator.Send(command);
+            idCriado = account.Id.ToString();
+            sucesso = true;
+            form = new();
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    private void Limpar()
+    {
+        form = new();
+        sucesso = false;
+        erro = null;
+    }
+
+    private class CreateAccountFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "O nome é obrigatório.")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, MinimumLength = 2, ErrorMessage = "Mínimo 2 caracteres.")]
+        public string AccountName { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,24 @@
+@* Exibe o status da conta como um badge colorido *@
+
+<span class="badge @CssClass">@Traduzir(Status)</span>
+
+@code {
+    [Parameter, System.ComponentModel.DataAnnotations.Required]
+    public string Status { get; set; } = string.Empty;
+
+    private string CssClass => Status switch
+    {
+        "Active"   => "badge-active",
+        "Blocked"  => "badge-blocked",
+        "Inactive" => "badge-inactive",
+        _          => "badge-inactive"
+    };
+
+    private static string Traduzir(string status) => status switch
+    {
+        "Active"   => "Ativo",
+        "Blocked"  => "Bloqueado",
+        "Inactive" => "Inativo",
+        _          => status
+    };
+}

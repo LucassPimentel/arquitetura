@@ -1,0 +1,97 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+
+<PageTitle>EWallet — Dashboard</PageTitle>
+
+<h1 class="ew-page-title">Dashboard</h1>
+<p class="ew-page-sub">Visão geral das contas — leitura via Read Model (MongoDB)</p>
+
+@if (carregando)
+{
+    <div class="ew-loading">⏳ Carregando contas...</div>
+}
+else if (erroCarregamento is not null)
+{
+    <div class="ew-alert ew-alert-error">⚠️ @erroCarregamento</div>
+}
+else
+{
+    <div class="ew-stats">
+        <div class="ew-card">
+            <div class="ew-card-title">Total de Contas</div>
+            <div class="ew-stat-value">@contas.Count()</div>
+        </div>
+        <div class="ew-card">
+            <div class="ew-card-title">Contas Ativas</div>
+            <div class="ew-stat-value" style="color:var(--success)">@contas.Count(c => c.Status == "Active")</div>
+        </div>
+        <div class="ew-card">
+            <div class="ew-card-title">Contas Bloqueadas</div>
+            <div class="ew-stat-value" style="color:var(--danger)">@contas.Count(c => c.Status == "Blocked")</div>
+        </div>
+        <div class="ew-card">
+            <div class="ew-card-title">Saldo Total</div>
+            <div class="ew-stat-value">@contas.Sum(c => c.Balance).ToString("C")</div>
+        </div>
+    </div>
+
+    <div class="ew-action-bar">
+        <span style="font-weight:600;font-size:15px">Contas</span>
+        <a href="/accounts/create" class="ew-btn ew-btn-primary">➕ Nova Conta</a>
+        <button class="ew-btn ew-btn-ghost" @onclick="Recarregar">🔄 Atualizar</button>
+    </div>
+
+    @if (!contas.Any())
+    {
+        <div class="ew-empty">
+            Nenhuma conta encontrada.<br />
+            <a href="/accounts/create" style="color:var(--primary2)">Criar a primeira conta</a>
+        </div>
+    }
+    else
+    {
+        <div class="ew-accounts">
+            @foreach (var conta in contas.OrderByDescending(c => c.CreatedAt))
+            {
+                <a href="/accounts/@conta.Id" class="ew-account-card">
+                    <div class="name">👤 @conta.UserName</div>
+                    <div class="balance">@conta.Balance.ToString("C")</div>
+                    <div class="meta">
+                        <span><StatusBadge Status="@conta.Status" /></span>
+                        <span>@conta.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+}
+
+@code {
+    private IEnumerable<AccountReadModel> contas = [];
+    private bool carregando = true;
+    private string? erroCarregamento;
+
+    protected override async Task OnInitializedAsync() => await CarregarContas();
+
+    private async Task Recarregar() => await CarregarContas();
+
+    private async Task CarregarContas()
+    {
+        carregando = true;
+        erroCarregamento = null;
+
+        try
+        {
+            contas = await Mediator.Send(new GetAllAccountsQuery());
+        }
+        catch (Exception ex)
+        {
+            erroCarregamento = $"Erro ao carregar contas: {ex.Message}";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}

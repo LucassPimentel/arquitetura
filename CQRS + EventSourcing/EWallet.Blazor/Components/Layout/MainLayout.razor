@@ -1,0 +1,27 @@
+﻿@inherits LayoutComponentBase
+
+<div class="ew-shell">
+    <nav class="ew-sidebar">
+        <div class="ew-logo">
+            <span class="ew-logo-icon">💳</span>
+            <span class="ew-logo-text">EWallet</span>
+        </div>
+        <ul class="ew-nav">
+            <li><NavLink href="/" Match="NavLinkMatch.All">🏠 Dashboard</NavLink></li>
+            <li><NavLink href="/accounts/create">➕ Nova Conta</NavLink></li>
+            <li><NavLink href="/events">📋 Event Store</NavLink></li>
+        </ul>
+    </nav>
+
+    <main class="ew-main">
+        <div class="ew-content">
+            @Body
+        </div>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    Ocorreu um erro inesperado.
+    <a href="" class="reload">Recarregar</a>
+    <a class="dismiss">✕</a>
+</div>
